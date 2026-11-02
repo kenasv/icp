@@ -1,0 +1,19 @@
+# ИСУП — локальный запуск: docker compose up --build
+# Фронтенд: http://localhost:9081, API: http://localhost:9080/api/portfolio
+# (порты 9080/9081 выбраны, чтобы не конфликтовать с локальными сервисами)
+services:
+  backend:
+    build: ./backend
+    container_name: isup-backend
+    ports:
+      - "9080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: isup-frontend
+    depends_on:
+      - backend
+    ports:
+      - "9081:80"
+    restart: unless-stopped

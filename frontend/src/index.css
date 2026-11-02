@@ -1,0 +1,84 @@
+/* Базовые стили ИСУП */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f5f6fa;
+}
+
+/* Диаграмма Ганта */
+.gantt-grid line {
+  stroke: #e8e8e8;
+  stroke-width: 1;
+}
+.gantt-month-line {
+  stroke: #d9d9d9;
+}
+.gantt-bar-work {
+  fill: #2f54eb;
+  border-radius: 3px;
+}
+.gantt-bar-work:hover {
+  fill: #1d39c4;
+}
+.gantt-dep-line {
+  stroke: #8c8c8c;
+  stroke-width: 1.5;
+  fill: none;
+}
+.gantt-dep-line.highlighted {
+  stroke: #fa541c;
+  stroke-width: 2.5;
+}
+.gantt-baseline-mark {
+  stroke: #bfbfbf;
+  stroke-width: 2;
+}
+
+/* Канбан пресейлов */
+.kanban-column {
+  background: #f0f2f5;
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 400px;
+}
+.kanban-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+}
+.kanban-card.dragging {
+  opacity: 0.5;
+}
+
+/* Лента событий */
+.event-ai .ant-timeline-item-content {
+  color: #531dab;
+}
+
+.bpmn-container {
+  height: 520px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mermaid-diagram {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+
+pre.report-text {
+  white-space: pre-wrap;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+}
