@@ -120,11 +120,11 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	s.st.RLockStore()
 	defer s.st.RUnlockStore()
 	writeJSON(w, 200, map[string]any{
-		"demoNow":     model.DemoNow,
-		"portfolio":   "Цифровизация B2B",
-		"director":    "Иванов И.И.",
-		"currency":    "млн ₽",
-		"aiProvider":  "DemoProvider (интерфейс ai.Provider; в пилоте подключается LLM)",
+		"demoNow":    model.DemoNow,
+		"portfolio":  "Цифровизация B2B",
+		"director":   "Иванов И.И.",
+		"currency":   "млн ₽",
+		"aiProvider": "DemoProvider (интерфейс ai.Provider; в пилоте подключается LLM)",
 	})
 }
 
@@ -219,10 +219,10 @@ func (s *Server) handlePortfolio(w http.ResponseWriter, r *http.Request) {
 	funnel := engine.ComputeFunnel(pres, s.st.Stages)
 
 	writeJSON(w, 200, map[string]any{
-		"name":       "Цифровизация B2B",
-		"director":   "Иванов И.И.",
-		"projects":   summaries,
-		"funnel":     funnel,
+		"name":     "Цифровизация B2B",
+		"director": "Иванов И.И.",
+		"projects": summaries,
+		"funnel":   funnel,
 		"metrics": map[string]any{
 			"revenuePlan": revPlan, "revenueForecast": revFc, "revenueActual": revAct,
 			"gmPlan": gmPlanW, "gmForecast": gmFcW,
@@ -330,13 +330,13 @@ func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 type projectCard struct {
-	Project        *model.Project          `json:"project"`
-	Client         *model.Client           `json:"client"`
-	Team           []teamView              `json:"team"`
-	Presale        *presaleView            `json:"presale"`
-	Computed       engine.ProjectComputed  `json:"computed"`
-	Summary        engine.ProjectSummary   `json:"summary"`
-	ChangeRequests []model.ChangeRequest   `json:"changeRequests"`
+	Project        *model.Project         `json:"project"`
+	Client         *model.Client          `json:"client"`
+	Team           []teamView             `json:"team"`
+	Presale        *presaleView           `json:"presale"`
+	Computed       engine.ProjectComputed `json:"computed"`
+	Summary        engine.ProjectSummary  `json:"summary"`
+	ChangeRequests []model.ChangeRequest  `json:"changeRequests"`
 }
 
 type teamView struct {
@@ -469,7 +469,7 @@ func (s *Server) handlePurchasePreview(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePatchPurchase(w http.ResponseWriter, r *http.Request) {
 	body, err := decode[struct {
-		ForecastDate *string              `json:"forecastDate"`
+		ForecastDate *string               `json:"forecastDate"`
 		Status       *model.PurchaseStatus `json:"status"`
 	}](r)
 	if err != nil {
@@ -510,9 +510,9 @@ func (s *Server) handleScenarios(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateScenario(w http.ResponseWriter, r *http.Request) {
 	body, err := decode[struct {
-		Name string               `json:"name"`
-		Ops  []model.ScenarioOp   `json:"ops"`
-		Save bool                 `json:"save"`
+		Name string             `json:"name"`
+		Ops  []model.ScenarioOp `json:"ops"`
+		Save bool               `json:"save"`
 	}](r)
 	if err != nil {
 		writeErr(w, 400, err)
@@ -559,9 +559,9 @@ func (s *Server) handleScenarioToCR(w http.ResponseWriter, r *http.Request) {
 	num := 20 + len(s.st.ChangeRequests)
 	cr := &model.ChangeRequest{
 		ID: fmt.Sprintf("ЗИ-2024-%03d", num), ProjectID: p.ID, Type: model.CRSchedule,
-		Reason:     "Из сценария what-if",
+		Reason:      "Из сценария what-if",
 		Description: fmt.Sprintf("Сценарий «%s»: %d операция(й) пересчёта.", sc.Name, len(sc.Ops)),
-		ImpactGMpp: gmPP, ImpactDDS: dds,
+		ImpactGMpp:  gmPP, ImpactDDS: dds,
 		Status: model.CRDraft, CreatedAt: model.DemoNow, Author: "РП", ScenarioID: sc.ID,
 	}
 	s.st.ChangeRequests[cr.ID] = cr
@@ -588,12 +588,12 @@ func (s *Server) handleCRs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateCR(w http.ResponseWriter, r *http.Request) {
 	body, err := decode[struct {
-		ProjectID   string      `json:"projectId"`
+		ProjectID   string       `json:"projectId"`
 		Type        model.CRType `json:"type"`
-		Reason      string      `json:"reason"`
-		Description string      `json:"description"`
-		Author      string      `json:"author"`
-		ScenarioID  string      `json:"scenarioId"`
+		Reason      string       `json:"reason"`
+		Description string       `json:"description"`
+		Author      string       `json:"author"`
+		ScenarioID  string       `json:"scenarioId"`
 	}](r)
 	if err != nil {
 		writeErr(w, 400, err)
