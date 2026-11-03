@@ -53,6 +53,7 @@ func (s *Server) routes() {
 	m := s.mux
 	m.HandleFunc("GET /api/meta", s.handleMeta)
 	m.HandleFunc("GET /api/directories", s.handleDirectories)
+	m.HandleFunc("POST /api/directories/{entity}", s.handleCreateDirectoryItem)
 	m.HandleFunc("GET /api/portfolio", s.handlePortfolio)
 
 	m.HandleFunc("GET /api/presales", s.handlePresales)
@@ -154,6 +155,54 @@ func (s *Server) handleDirectories(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"clients": clients, "suppliers": suppliers, "employees": employees, "stages": s.st.Stages,
 	})
+}
+
+// handleCreateDirectoryItem — заведение новой позиции справочника (Ф12):
+// POST /api/directories/clients | suppliers | employees.
+// Этапы воронки не создаются произвольно — их вероятности связаны с движком (Ф2).
+func (s *Server) handleCreateDirectoryItem(w http.ResponseWriter, r *http.Request) {
+	entity := r.PathValue("entity")
+	s.st.LockStore()
+	var (
+		created any
+		err     error
+	)
+	switch entity {
+	case "clients":
+		var c model.Client
+		if err = json.NewDecoder(r.Body).Decode(&c); err == nil {
+			var pc *model.Client
+			if pc, err = s.st.CreateClient(c); err == nil {
+				created = pc
+			}
+		}
+	case "suppliers":
+		var x model.Supplier
+		if err = json.NewDecoder(r.Body).Decode(&x); err == nil {
+			var px *model.Supplier
+			if px, err = s.st.CreateSupplier(x); err == nil {
+				created = px
+			}
+		}
+	case "employees":
+		var e model.Employee
+		if err = json.NewDecoder(r.Body).Decode(&e); err == nil {
+			var pe *model.Employee
+			if pe, err = s.st.CreateEmployee(e); err == nil {
+				created = pe
+			}
+		}
+	default:
+		s.st.UnlockStore()
+		writeErr(w, 404, fmt.Errorf("неизвестный справочник: %s", entity))
+		return
+	}
+	s.st.UnlockStore()
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	writeJSON(w, 201, created)
 }
 
 func sortedVals[T any](m map[string]T) []T {

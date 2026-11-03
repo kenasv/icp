@@ -74,6 +74,82 @@ func (s *Store) RUnlockStore() { s.mu.RUnlock() }
 func (s *Store) LockStore()    { s.mu.Lock() }
 func (s *Store) UnlockStore()  { s.mu.Unlock() }
 
+// ============ Справочники (Ф12) ============
+
+// nextMapID — следующий свободный ID вида prefix-NNN в карте (существующие
+// нечисловые суффиксы вроде cl-rzd пропускаются).
+func nextMapID[V any](m map[string]V, prefix string) string {
+	max := 0
+	for k := range m {
+		suffix := strings.TrimPrefix(k, prefix+"-")
+		if suffix != k {
+			if n, err := strconv.Atoi(suffix); err == nil && n > max {
+				max = n
+			}
+		}
+	}
+	return fmt.Sprintf("%s-%03d", prefix, max+1)
+}
+
+// CreateClient — новая позиция справочника клиентов (Ф12). ИНН проверяется на дубли.
+func (s *Store) CreateClient(c model.Client) (*model.Client, error) {
+	c.Name = strings.TrimSpace(c.Name)
+	if c.Name == "" {
+		return nil, fmt.Errorf("укажите наименование клиента")
+	}
+	if c.INN != "" {
+		for _, x := range s.Clients {
+			if x.INN == c.INN {
+				return nil, fmt.Errorf("клиент с ИНН %s уже есть в справочнике: %s", c.INN, x.Name)
+			}
+		}
+	}
+	if c.ID == "" {
+		c.ID = nextMapID(s.Clients, "cl")
+	}
+	s.Clients[c.ID] = c
+	return &c, nil
+}
+
+// CreateSupplier — новая позиция справочника поставщиков (Ф12).
+func (s *Store) CreateSupplier(x model.Supplier) (*model.Supplier, error) {
+	x.Name = strings.TrimSpace(x.Name)
+	if x.Name == "" {
+		return nil, fmt.Errorf("укажите наименование поставщика")
+	}
+	for _, v := range s.Suppliers {
+		if v.Name == x.Name {
+			return nil, fmt.Errorf("поставщик «%s» уже есть в справочнике", x.Name)
+		}
+	}
+	if x.ID == "" {
+		x.ID = nextMapID(s.Suppliers, "sup")
+	}
+	s.Suppliers[x.ID] = x
+	return &x, nil
+}
+
+// CreateEmployee — новая позиция справочника сотрудников (Ф12).
+func (s *Store) CreateEmployee(e model.Employee) (*model.Employee, error) {
+	e.Name = strings.TrimSpace(e.Name)
+	if e.Name == "" {
+		return nil, fmt.Errorf("укажите ФИО сотрудника")
+	}
+	for _, v := range s.Employees {
+		if v.Name == e.Name {
+			return nil, fmt.Errorf("сотрудник «%s» уже есть в справочнике", e.Name)
+		}
+	}
+	if e.Position == "" {
+		e.Position = "Инженер"
+	}
+	if e.ID == "" {
+		e.ID = nextMapID(s.Employees, "emp")
+	}
+	s.Employees[e.ID] = e
+	return &e, nil
+}
+
 // ============ События ============
 
 // AddEvent — запись в ленту здоровья проекта.

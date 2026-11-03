@@ -25,6 +25,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   meta: () => req<any>('/meta'),
   directories: () => req<any>('/directories'),
+  createDirectoryItem: (entity: 'clients' | 'suppliers' | 'employees', body: any) =>
+    req<any>(`/directories/${entity}`, { method: 'POST', body: JSON.stringify(body) }),
 
   portfolio: () => req<Portfolio>('/portfolio'),
 
