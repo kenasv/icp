@@ -144,6 +144,7 @@ export default function Dashboard() {
                   rowKey="id"
                   size="small"
                   dataSource={data.projects as any}
+                  scroll={{ x: 1150 }}
                   onRow={(r) => ({ onClick: () => navigate(`/projects/${r.id}`), style: { cursor: 'pointer' } })}
                   pagination={false}
                   columns={[

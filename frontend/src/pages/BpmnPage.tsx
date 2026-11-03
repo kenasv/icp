@@ -81,11 +81,11 @@ export default function BpmnPage() {
       size="small"
       title="BPMN-процессы ИСУП: генерация и изменение"
       extra={
-        <Space>
+        <Space wrap>
           <Select
             value={key || undefined}
             onChange={setKey}
-            style={{ width: 340 }}
+            style={{ width: 'min(340px, calc(100vw - 48px))' }}
             placeholder="Выберите процесс"
             options={list.map((d) => ({ value: d.key, label: d.name }))}
           />

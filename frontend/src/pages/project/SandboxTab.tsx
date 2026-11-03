@@ -107,11 +107,11 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
     <div>
       <Card size="small" title={<span><ExperimentOutlined /> Конструктор сценария</span>} style={{ marginBottom: 16 }}>
         <Space wrap size={16}>
-          <Input placeholder="Название сценария" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 320 }} />
+          <Input placeholder="Название сценария" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 'min(320px, calc(100vw - 48px))' }} />
           <Space.Compact>
             <Select
               placeholder="Сдвинуть веху…"
-              style={{ width: 260 }}
+              style={{ width: 'min(260px, calc(100vw - 48px))' }}
               value={undefined}
               onSelect={(id: string) => {
                 Modal.confirm({
@@ -137,7 +137,7 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
           </Space.Compact>
           <Select
             placeholder="Изменить длительность работы…"
-            style={{ width: 260 }}
+            style={{ width: 'min(260px, calc(100vw - 48px))' }}
             value={undefined}
             onSelect={(id: string) => {
               Modal.confirm({
@@ -205,6 +205,7 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
             size="small"
             dataSource={rows}
             pagination={false}
+            scroll={{ x: 640 }}
             columns={[
               { title: 'Показатель', dataIndex: 'name' },
               col('Базовый план', comparison.base),
@@ -221,6 +222,7 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
           size="small"
           dataSource={scenarios}
           pagination={false}
+          scroll={{ x: 640 }}
           locale={{ emptyText: 'Сценариев пока нет' }}
           columns={[
             { title: 'Название', dataIndex: 'name' },

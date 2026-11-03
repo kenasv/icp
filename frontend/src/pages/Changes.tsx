@@ -28,6 +28,7 @@ export default function Changes() {
         size="small"
         dataSource={crs}
         pagination={false}
+        scroll={{ x: 1250 }}
         columns={[
           { title: 'Номер', dataIndex: 'id', width: 120 },
           {

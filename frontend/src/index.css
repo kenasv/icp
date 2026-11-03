@@ -6,6 +6,65 @@ html, body, #root {
   background: #f5f6fa;
 }
 
+/* === Адаптивная вёрстка (ПК ≥992px / планшет / телефон <768px) === */
+
+/* Таблицы: плотнее на узких экранах (работают с scroll={{x}} внутри карточек) */
+@media (max-width: 768px) {
+  .ant-table-cell {
+    padding: 8px 6px !important;
+  }
+  .ant-table.ant-table-small .ant-table-cell {
+    padding: 6px 5px !important;
+  }
+}
+
+/* Канбан пресейлов: свайп по этапам на планшете/телефоне */
+.kanban-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+/* Диаграмма Ганта */
+.gantt-left {
+  width: 320px;
+  flex-shrink: 0;
+}
+.gantt-left-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 992px) {
+  .gantt-left {
+    width: 216px;
+  }
+}
+@media (max-width: 576px) {
+  .gantt-left {
+    width: 150px;
+  }
+}
+
+/* BPMN-редактор: ниже на телефоне/планшете */
+@media (max-width: 768px) {
+  .bpmn-container {
+    height: 400px;
+  }
+}
+
+/* Матрица рисков 3×3: колонки уже на малых экранах */
+.risk-matrix {
+  display: grid;
+  grid-template-columns: 20px repeat(3, 120px);
+  gap: 4px;
+}
+@media (max-width: 768px) {
+  .risk-matrix {
+    grid-template-columns: 16px repeat(3, minmax(78px, 1fr));
+  }
+}
+
 /* Диаграмма Ганта */
 .gantt-grid line {
   stroke: #e8e8e8;

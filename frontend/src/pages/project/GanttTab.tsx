@@ -46,6 +46,7 @@ export default function GanttTab({ data, reload }: { data: ProjectCard; reload: 
           size="small"
           dataSource={rows}
           pagination={false}
+          scroll={{ x: 1050 }}
           columns={[
             {
               title: 'Тип', dataIndex: 'type', width: 90,

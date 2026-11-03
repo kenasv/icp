@@ -48,6 +48,7 @@ export default function ChangesTab({ data, reload }: { data: ProjectCard; reload
         size="small"
         dataSource={crs}
         pagination={false}
+        scroll={{ x: 1250 }}
         locale={{ emptyText: 'Запросов нет' }}
         columns={[
           { title: 'Номер', dataIndex: 'id', width: 130 },

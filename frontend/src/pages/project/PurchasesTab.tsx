@@ -44,6 +44,7 @@ export default function PurchasesTab({ data, reload }: { data: ProjectCard; relo
         size="small"
         dataSource={purchases}
         pagination={false}
+        scroll={{ x: 1100 }}
         locale={{ emptyText: 'Закупок нет' }}
         columns={[
           { title: 'Номер', dataIndex: 'number', width: 130 },
@@ -104,7 +105,7 @@ export default function PurchasesTab({ data, reload }: { data: ProjectCard; relo
         okText="Пересчитать и сохранить"
         cancelText="Отмена"
         confirmLoading={saving}
-        width={640}
+        width="min(640px, calc(100vw - 24px))"
       >
         {preview && (
           <>

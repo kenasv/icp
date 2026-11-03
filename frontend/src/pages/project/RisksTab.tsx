@@ -27,8 +27,8 @@ export default function RisksTab({ data }: { data: ProjectCard }) {
 
   return (
     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-      <Card size="small" title="Матрица рисков 3×3 (Ф31)" style={{ flexGrow: 1, maxWidth: 460 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '24px repeat(3, 120px)', gap: 4 }}>
+      <Card size="small" title="Матрица рисков 3×3 (Ф31)" style={{ flexGrow: 1, flexBasis: 460, maxWidth: '100%' }}>
+        <div className="risk-matrix">
           <div />
           {IMPACTS.map((i) => (
             <Typography.Text key={i} type="secondary" style={{ textAlign: 'center', fontSize: 12 }}>
@@ -76,12 +76,13 @@ export default function RisksTab({ data }: { data: ProjectCard }) {
         </Typography.Paragraph>
       </Card>
 
-      <Card size="small" title="Карта рисков (Ф30)" style={{ flexGrow: 2, minWidth: 420 }}>
+      <Card size="small" title="Карта рисков (Ф30)" style={{ flexGrow: 2, flexBasis: 420, maxWidth: '100%' }}>
         <Table<Risk>
           rowKey="id"
           size="small"
           dataSource={risks}
           pagination={false}
+          scroll={{ x: 900 }}
           locale={{ emptyText: 'Риски не зарегистрированы' }}
           columns={[
             { title: 'Риск', dataIndex: 'name' },

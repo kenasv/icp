@@ -85,7 +85,7 @@ export default function Presales() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
           Воронка пресейлов
           <Typography.Text type="secondary" style={{ fontSize: 13, marginLeft: 10 }}>
@@ -97,28 +97,35 @@ export default function Presales() {
           placeholder="Поиск по названию/клиенту"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 280 }}
+          style={{ width: 'min(280px, calc(100vw - 56px))' }}
         />
       </div>
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, minmax(210px, 1fr))`, gap: 10 }}>
-          {totals.map(({ stage, count, sum, weighted }) => (
-            <Column key={stage.id} stage={stage} count={count} sum={sum} weighted={weighted}>
-              {filtered
-                .filter((p) => p.stageId === stage.id)
-                .map((p) => (
-                  <PresaleCard key={p.id} ps={p} onOpen={() => setSelected(p)} />
-                ))}
-            </Column>
-          ))}
+        <div className="kanban-scroll">
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stages.length}, minmax(min(210px, 78vw), 1fr))`, gap: 10 }}>
+            {totals.map(({ stage, count, sum, weighted }) => (
+              <Column key={stage.id} stage={stage} count={count} sum={sum} weighted={weighted}>
+                {filtered
+                  .filter((p) => p.stageId === stage.id)
+                  .map((p) => (
+                    <PresaleCard key={p.id} ps={p} onOpen={() => setSelected(p)} />
+                  ))}
+              </Column>
+            ))}
+          </div>
         </div>
       </DndContext>
 
       {converted.length > 0 && (
         <Card size="small" title={`Переданные в проекты (${converted.length})`} style={{ marginTop: 16 }}>
           {converted.map((p) => (
-            <Tag key={p.id} color="success" style={{ cursor: 'pointer' }} onClick={() => navigate(`/projects/${p.projectId}`)}>
+            <Tag
+              key={p.id}
+              color="success"
+              style={{ cursor: 'pointer', whiteSpace: 'normal', height: 'auto', marginBottom: 4 }}
+              onClick={() => navigate(`/projects/${p.projectId}`)}
+            >
               {p.number} «{p.name}» → {p.projectId} ({fmtDate(p.convertedAt)})
             </Tag>
           ))}
@@ -127,7 +134,7 @@ export default function Presales() {
 
       <Drawer
         title={selected ? `${selected.number} · ${selected.name}` : ''}
-        width={480}
+        width="min(480px, 100vw)"
         open={!!selected}
         onClose={() => setSelected(null)}
       >

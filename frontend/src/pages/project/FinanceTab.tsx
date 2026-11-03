@@ -99,6 +99,7 @@ export default function FinanceTab({ data }: { data: ProjectCard }) {
           style={{ marginTop: 12 }}
           pagination={false}
           dataSource={f.dds.monthly}
+          scroll={{ x: 1050 }}
           columns={[
             { title: 'Месяц', dataIndex: 'month', width: 140, render: (m: string) => fmtMonth(m) },
             { title: 'Входящие (план)', dataIndex: ['in', 'plan'], align: 'right' as const, render: (v: number) => v.toFixed(1).replace('.', ',') },

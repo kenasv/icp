@@ -23,6 +23,7 @@ export default function Projects() {
         size="small"
         dataSource={rows}
         pagination={false}
+        scroll={{ x: 1150 }}
         onRow={(r) => ({ onClick: () => navigate(`/projects/${r.id}`), style: { cursor: 'pointer' } })}
         columns={[
           { title: 'Номер', dataIndex: 'id', width: 130 },

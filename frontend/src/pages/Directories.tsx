@@ -25,7 +25,8 @@ export default function Directories() {
             key: 'clients',
             label: `Клиенты (${data.clients.length})`,
             children: (
-              <Table<Client> rowKey="id" size="small" dataSource={data.clients} pagination={false}
+                <Table<Client> rowKey="id" size="small" dataSource={data.clients} pagination={false}
+                scroll={{ x: 660 }}
                 columns={[
                   { title: 'Наименование', dataIndex: 'name' },
                   { title: 'ИНН', dataIndex: 'inn', width: 140 },

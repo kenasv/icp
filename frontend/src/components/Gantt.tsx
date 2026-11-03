@@ -7,7 +7,6 @@ import { fmtDate, fmtDateShort, fmtMoney, fmtMonth } from '../format'
 // Сравнение с базовым планом (Ф18): сдвинутые элементы подсвечиваются красным
 // с отклонением в днях. Наведение на веху — карточка привязок (Ф16).
 
-const LEFT = 320 // ширина колонки с названиями
 const ROW_H = 38
 const HEAD_H = 40
 const DAY_W = 3.6 // пикселей на день
@@ -61,9 +60,9 @@ export default function Gantt({ rows, from, to }: Props) {
   return (
     <div style={{ border: '1px solid #eee', borderRadius: 8, background: '#fff', overflow: 'hidden' }}>
       <div style={{ display: 'flex' }}>
-        {/* Левая колонка: названия элементов СДР */}
-        <div style={{ width: LEFT, flexShrink: 0, borderRight: '1px solid #eee' }}>
-          <div style={{ height: HEAD_H, borderBottom: '1px solid #eee', padding: '10px 12px', fontWeight: 600, fontSize: 13 }}>
+        {/* Левая колонка: названия элементов СДР (ширина — .gantt-left в index.css) */}
+        <div className="gantt-left" style={{ borderRight: '1px solid #eee' }}>
+          <div className="gantt-left-title" style={{ height: HEAD_H, borderBottom: '1px solid #eee', padding: '10px 12px', fontWeight: 600, fontSize: 13 }}>
             СДР (этапы / работы / вехи)
           </div>
           {rows.map((r) => (

@@ -50,7 +50,7 @@ export default function AiChat() {
       <Drawer
         title={<span><RobotOutlined /> ИИ-ассистент ИСУП</span>}
         placement="right"
-        width={420}
+        width="min(420px, 100vw)"
         open={open}
         onClose={() => setOpen(false)}
         styles={{ body: { display: 'flex', flexDirection: 'column', padding: '12px 16px' } }}

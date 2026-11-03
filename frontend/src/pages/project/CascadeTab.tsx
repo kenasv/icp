@@ -25,6 +25,7 @@ export default function CascadeTab({ data }: { data: ProjectCard }) {
           size="small"
           dataSource={c.rows}
           pagination={false}
+          scroll={{ x: 820 }}
           columns={[
             {
               title: 'Тип', dataIndex: 'type', width: 90,
@@ -53,6 +54,7 @@ export default function CascadeTab({ data }: { data: ProjectCard }) {
           size="small"
           dataSource={c.financeShifts}
           pagination={false}
+          scroll={{ x: 820 }}
           columns={[
             {
               title: 'Статья', dataIndex: 'article', width: 150,
@@ -79,6 +81,7 @@ export default function CascadeTab({ data }: { data: ProjectCard }) {
           size="small"
           dataSource={c.purchases}
           pagination={false}
+          scroll={{ x: 1050 }}
           columns={[
             { title: 'Номер', dataIndex: 'number', width: 130 },
             { title: 'Наименование', dataIndex: 'name' },
