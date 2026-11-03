@@ -129,7 +129,13 @@ func Summarize(p *model.Project, dir *Directories) ProjectSummary {
 
 // BuildCascade — сборка «каскада последствий».
 func BuildCascade(p *model.Project, rows []WBSRow, fc FinanceComputed) CascadeComputed {
-	cc := CascadeComputed{}
+	// Срезы инициализируются пустыми: у проекта без базового плана/закупок
+	// API должен отдавать [], а не null.
+	cc := CascadeComputed{
+		Rows:          []CascadeRow{},
+		FinanceShifts: []FinanceShift{},
+		Purchases:     []PurchaseCascade{},
+	}
 	if b := LatestBaseline(p); b != nil {
 		cc.BaselineVersion = b.Version
 	}

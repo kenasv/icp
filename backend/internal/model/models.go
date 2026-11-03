@@ -120,6 +120,36 @@ type Project struct {
 	Scenarios      []Scenario    `json:"scenarios"`
 }
 
+// EnsureSlices — заменяет nil-срезы на пустые, чтобы API не отдавал JSON null
+// там, где фронтенд ждёт массив (актуально для проектов, созданных из пресейла
+// до первого базового плана/риска/события).
+func (p *Project) EnsureSlices() {
+	if p.Team == nil {
+		p.Team = []TeamMember{}
+	}
+	if p.WBS == nil {
+		p.WBS = []WBSItem{}
+	}
+	if p.Budget == nil {
+		p.Budget = []BudgetItem{}
+	}
+	if p.Purchases == nil {
+		p.Purchases = []Purchase{}
+	}
+	if p.Risks == nil {
+		p.Risks = []Risk{}
+	}
+	if p.Baselines == nil {
+		p.Baselines = []Baseline{}
+	}
+	if p.Events == nil {
+		p.Events = []Event{}
+	}
+	if p.Scenarios == nil {
+		p.Scenarios = []Scenario{}
+	}
+}
+
 // TeamMember — назначение участника с ролью (Ф35).
 type TeamMember struct {
 	EmployeeID string `json:"employeeId"`

@@ -53,7 +53,7 @@ export default function ProjectCardPage() {
             {fmtPct(computed.finance.gm.plan, 0)} / {fmtPct(computed.finance.gm.forecast, 0)}
           </Descriptions.Item>
           <Descriptions.Item label="Базовый план">
-            {project.baselines.length
+            {(project.baselines || []).length
               ? `v${project.baselines[project.baselines.length - 1].version} от ${fmtDate(project.baselines[project.baselines.length - 1].approvedAt)}`
               : 'не утверждён'}
           </Descriptions.Item>
@@ -61,7 +61,7 @@ export default function ProjectCardPage() {
             {presale ? `${presale.number} «${presale.name}»` : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Команда" span={2}>
-            {data.team.map((t) => `${t.name} (${t.role})`).join(', ') || '—'}
+            {(data.team || []).map((t) => `${t.name} (${t.role})`).join(', ') || '—'}
           </Descriptions.Item>
         </Descriptions>
       </Card>

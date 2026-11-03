@@ -1,10 +1,35 @@
 # ИСУП — локальный запуск: docker compose up --build
-# Фронтенд: http://localhost:9081, API: http://localhost:9080/api/portfolio
-# (порты 9080/9081 выбраны, чтобы не конфликтовать с локальными сервисами)
+# Фронтенд: http://localhost (порт 80), API: http://localhost:9080/api/portfolio
+# Данные хранятся в PostgreSQL (сервис db, volume isup-pgdata):
+# состояние переживает рестарт контейнеров; сброс демо-данных — `docker compose down -v`.
+# (порты 9080 и 5433 выбраны, чтобы не конфликтовать с локальными сервисами)
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: isup-db
+    environment:
+      POSTGRES_USER: isup
+      POSTGRES_PASSWORD: isup
+      POSTGRES_DB: isup
+    ports:
+      - "5433:5432"
+    volumes:
+      - isup-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U isup -d isup"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   backend:
     build: ./backend
     container_name: isup-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ISUP_DB_DSN: postgres://isup:isup@db:5432/isup?sslmode=disable
     ports:
       - "9080:8080"
     restart: unless-stopped
@@ -17,3 +42,6 @@ services:
     ports:
       - "80:80"
     restart: unless-stopped
+
+volumes:
+  isup-pgdata:

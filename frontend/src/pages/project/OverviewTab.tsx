@@ -45,7 +45,7 @@ export default function OverviewTab({ data, reload }: { data: ProjectCard; reloa
   }
 
   const h = computed.health
-  const events = [...project.events].sort((a, b) => +new Date(b.at) - +new Date(a.at))
+  const events = [...(project.events || [])].sort((a, b) => +new Date(b.at) - +new Date(a.at))
 
   const statusFlow = ['Планирование', 'В реализации', 'Завершён', 'Архив']
 

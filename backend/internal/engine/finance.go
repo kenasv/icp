@@ -82,6 +82,9 @@ type DDSside struct {
 // ComputeFinance — расчёт финансов проекта (вызывается после RecalcSchedule).
 func ComputeFinance(p *model.Project) FinanceComputed {
 	fc := FinanceComputed{OebsSyncAt: "01.04.2024 06:00"}
+	// Пустые срезы вместо nil — чтобы в JSON не приходил null (проекты без помесячных данных).
+	fc.Articles = []ArticleRow{}
+	fc.DDS.Monthly = []DDSMonth{}
 
 	monthSet := map[string]bool{}
 	for i := range p.Budget {
@@ -133,6 +136,7 @@ func ComputeFinance(p *model.Project) FinanceComputed {
 		Plan:     gmOf(fc.Revenue.Total.Plan, fc.Cost.Total.Plan),
 		Forecast: gmOf(fc.Revenue.Total.Forecast, fc.Cost.Total.Forecast),
 		Actual:   gmOf(fc.Revenue.Total.Actual, fc.Cost.Total.Actual),
+		Monthly:  []GMMonth{},
 	}
 	for _, m := range fc.Months {
 		fc.GM.Monthly = append(fc.GM.Monthly, GMMonth{

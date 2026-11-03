@@ -9,7 +9,7 @@ import { fmtDate, fmtSignedPct } from '../../format'
 export default function ChangesTab({ data, reload }: { data: ProjectCard; reload: () => void }) {
   const [form] = Form.useForm()
   const [open, setOpen] = useState(false)
-  const crs = [...data.changeRequests].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+  const crs = [...(data.changeRequests || [])].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
 
   const create = async (vals: any) => {
     try {

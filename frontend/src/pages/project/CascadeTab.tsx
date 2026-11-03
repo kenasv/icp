@@ -6,8 +6,9 @@ import { fmtDate, fmtMoney, fmtMonth } from '../../format'
 // прогноза по срокам (Ф18), финансам (Ф26) и закупкам (Ф29). Все числа — движок.
 export default function CascadeTab({ data }: { data: ProjectCard }) {
   const c = data.computed.cascade
-  const shiftedRows = c.rows.filter((r) => r.shifted && r.devDays !== 0)
-  const shiftedFinance = c.financeShifts.filter((f) => f.shiftMonths !== 0)
+  const rows = c.rows || []
+  const shiftedRows = rows.filter((r) => r.shifted && r.devDays !== 0)
+  const shiftedFinance = (c.financeShifts || []).filter((f) => f.shiftMonths !== 0)
 
   return (
     <div>
@@ -23,7 +24,7 @@ export default function CascadeTab({ data }: { data: ProjectCard }) {
         <Table
           rowKey="itemId"
           size="small"
-          dataSource={c.rows}
+          dataSource={rows}
           pagination={false}
           scroll={{ x: 820 }}
           columns={[
@@ -52,7 +53,7 @@ export default function CascadeTab({ data }: { data: ProjectCard }) {
         <Table
           rowKey="itemId"
           size="small"
-          dataSource={c.financeShifts}
+          dataSource={c.financeShifts || []}
           pagination={false}
           scroll={{ x: 820 }}
           columns={[
@@ -79,7 +80,7 @@ export default function CascadeTab({ data }: { data: ProjectCard }) {
         <Table
           rowKey="number"
           size="small"
-          dataSource={c.purchases}
+          dataSource={c.purchases || []}
           pagination={false}
           scroll={{ x: 1050 }}
           columns={[

@@ -16,7 +16,7 @@ export default function FinanceTab({ data }: { data: ProjectCard }) {
     return v === 0 ? <span style={{ color: '#ccc' }}>—</span> : v.toFixed(1).replace('.', ',')
   }
 
-  const ddsData = f.dds.monthly.map((d) => ({
+  const ddsData = (f.dds.monthly || []).map((d) => ({
     month: fmtMonthShort(d.month),
     'Входящие (план)': +d.in.plan.toFixed(2),
     'Исходящие (план)': +d.out.plan.toFixed(2),
@@ -29,7 +29,7 @@ export default function FinanceTab({ data }: { data: ProjectCard }) {
     'Разрыв (факт)': +d.gap.actual.toFixed(2),
   }))
 
-  const gmData = f.gm.monthly.map((m) => ({
+  const gmData = (f.gm.monthly || []).map((m) => ({
     month: fmtMonthShort(m.month),
     'GM план, %': +(m.plan * 100).toFixed(1),
     'GM прогноз, %': +(m.forecast * 100).toFixed(1),
@@ -98,7 +98,7 @@ export default function FinanceTab({ data }: { data: ProjectCard }) {
           size="small"
           style={{ marginTop: 12 }}
           pagination={false}
-          dataSource={f.dds.monthly}
+          dataSource={f.dds.monthly || []}
           scroll={{ x: 1050 }}
           columns={[
             { title: 'Месяц', dataIndex: 'month', width: 140, render: (m: string) => fmtMonth(m) },

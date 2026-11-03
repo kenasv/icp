@@ -29,6 +29,10 @@ export const api = {
   portfolio: () => req<Portfolio>('/portfolio'),
 
   presales: () => req<PresaleView[]>('/presales'),
+  createPresale: (body: {
+    name: string; clientId: string; product?: string; region?: string;
+    amount: number; stageId: string; leadSource?: string; team?: string[];
+  }) => req<PresaleView>('/presales', { method: 'POST', body: JSON.stringify(body) }),
   movePresale: (id: string, stageId: string) =>
     req<PresaleView>(`/presales/${id}`, { method: 'PATCH', body: JSON.stringify({ stageId }) }),
   convertPresale: (id: string) =>

@@ -1,6 +1,7 @@
-// Package store — in-memory хранилище ИСУП с предзагруженными демо-данными.
-// Для демо-версии persistence не требуется (требование 4.1.2): внешние источники
-// заменены заглушкой, состояние живёт в процессе.
+// Package store — хранилище ИСУП с предзагруженными демо-данными.
+// Рабочее состояние хранится в PostgreSQL (internal/pg, включается через ISUP_DB_DSN);
+// без DSN хранилище работает в памяти процесса (локальная разработка, тесты).
+// Факт финансов — модуль-заглушка «OEBS-факт» (требование 4.1.2).
 package store
 
 import (
@@ -28,9 +29,9 @@ type Store struct {
 	eventSeq       int
 }
 
-// New — создаёт хранилище и загружает демо-данные портфеля «Цифровизация B2B».
-func New() *Store {
-	s := &Store{
+// NewEmpty — пустое хранилище без демо-данных (сюда загружается состояние из PostgreSQL).
+func NewEmpty() *Store {
+	return &Store{
 		Clients:        map[string]model.Client{},
 		Suppliers:      map[string]model.Supplier{},
 		Employees:      map[string]model.Employee{},
@@ -39,8 +40,25 @@ func New() *Store {
 		ChangeRequests: map[string]*model.ChangeRequest{},
 		BPMN:           map[string]string{},
 	}
+}
+
+// New — создаёт хранилище и загружает демо-данные портфеля «Цифровизация B2B».
+func New() *Store {
+	s := NewEmpty()
 	s.seed()
 	return s
+}
+
+// PostLoad — восстановление служебных последовательностей после загрузки из БД.
+func (s *Store) PostLoad() {
+	for _, p := range s.Projects {
+		for _, ev := range p.Events {
+			var n int
+			if _, err := fmt.Sscanf(ev.ID, "EV-%d", &n); err == nil && n > s.eventSeq {
+				s.eventSeq = n
+			}
+		}
+	}
 }
 
 // Dirs — справочники для движка.
@@ -68,6 +86,55 @@ func (s *Store) AddEvent(p *model.Project, at time.Time, t model.EventType, text
 }
 
 // ============ Пресейлы ============
+
+// CreatePresale — заведение новой карточки пресейла из интерфейса (Ф1).
+// Номер ПС-ГГГГ-NNN присваивается автоматически, история начинается с выбранного этапа.
+func (s *Store) CreatePresale(ps model.Presale) (*model.Presale, error) {
+	ps.Name = strings.TrimSpace(ps.Name)
+	if ps.Name == "" {
+		return nil, fmt.Errorf("укажите название пресейла")
+	}
+	if ps.ClientID == "" {
+		return nil, fmt.Errorf("выберите клиента из справочника")
+	}
+	if _, ok := s.Clients[ps.ClientID]; !ok {
+		return nil, fmt.Errorf("клиент %s не найден в справочнике", ps.ClientID)
+	}
+	stageOK := false
+	for _, st := range s.Stages {
+		if st.ID == ps.StageID {
+			stageOK = true
+			break
+		}
+	}
+	if !stageOK {
+		return nil, fmt.Errorf("неизвестный этап воронки: %s", ps.StageID)
+	}
+	if ps.Amount <= 0 {
+		return nil, fmt.Errorf("сумма должна быть больше нуля")
+	}
+	// Следующий свободный номер ПС-ГГГГ-NNN.
+	max := 0
+	for _, p := range s.Presales {
+		parts := strings.Split(p.Number, "-")
+		if len(parts) == 3 {
+			if n, err := strconv.Atoi(parts[2]); err == nil && n > max {
+				max = n
+			}
+		}
+	}
+	ps.ID = fmt.Sprintf("PS-2024-%03d", max+1)
+	ps.Number = fmt.Sprintf("ПС-2024-%03d", max+1)
+	ps.ProjectID = ""
+	ps.StageHistory = []model.StageChange{{
+		Date: model.DemoNow, ToStage: ps.StageID, Comment: "Карточка создана в интерфейсе",
+	}}
+	if ps.LeadSource == "" {
+		ps.LeadSource = "Прочее"
+	}
+	s.Presales[ps.ID] = &ps
+	return &ps, nil
+}
 
 // MovePresaleStage — смена этапа воронки (канбан, Ф3); история фиксируется.
 func (s *Store) MovePresaleStage(id, stageID string) (*model.Presale, error) {
@@ -136,6 +203,7 @@ func (s *Store) ConvertPresale(id string) (*model.Project, error) {
 	now := model.DemoNow
 	ps.ProjectID = p.ID
 	ps.ConvertedAt = &now
+	p.EnsureSlices() // Baselines/Purchases/Risks/… как пустые массивы, не null в JSON
 	s.Projects[p.ID] = p
 	s.AddEvent(p, now, model.EventStatus, "Проект создан из пресейла "+ps.Number+" (данные перенесены автоматически)", "Система")
 	// Связь видна в обеих карточках (Ф6).

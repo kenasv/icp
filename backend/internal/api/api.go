@@ -16,22 +16,38 @@ import (
 	"isup/internal/c4"
 	"isup/internal/engine"
 	"isup/internal/model"
+	"isup/internal/pg"
 	"isup/internal/store"
 )
 
 type Server struct {
 	st  *store.Store
 	ai  ai.Provider
+	pg  *pg.DB // nil — работа без PostgreSQL (память процесса)
 	mux *http.ServeMux
 }
 
-func New(s *store.Store) *Server {
-	srv := &Server{st: s, ai: ai.NewDemoProvider(s), mux: http.NewServeMux()}
+func New(s *store.Store, database *pg.DB) *Server {
+	srv := &Server{st: s, ai: ai.NewDemoProvider(s), pg: database, mux: http.NewServeMux()}
 	srv.routes()
 	return srv
 }
 
-func (s *Server) Handler() http.Handler { return s.cors(s.mux) }
+func (s *Server) Handler() http.Handler { return s.cors(s.persist(s.mux)) }
+
+// persist — после каждого изменяющего запроса состояние синхронизируется
+// в PostgreSQL (одной транзакцией; см. internal/pg). Вызывается уже после
+// снятия блокировок хранилища в обработчике.
+func (s *Server) persist(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+		if s.pg != nil && r.Method != http.MethodGet && r.Method != http.MethodOptions {
+			if err := s.pg.Sync(s.st); err != nil {
+				log.Printf("ОШИБКА: синхронизация с PostgreSQL: %v", err)
+			}
+		}
+	})
+}
 
 func (s *Server) routes() {
 	m := s.mux
@@ -40,6 +56,7 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/portfolio", s.handlePortfolio)
 
 	m.HandleFunc("GET /api/presales", s.handlePresales)
+	m.HandleFunc("POST /api/presales", s.handleCreatePresale)
 	m.HandleFunc("PATCH /api/presales/{id}", s.handlePatchPresale)
 	m.HandleFunc("POST /api/presales/{id}/convert", s.handleConvertPresale)
 
@@ -278,6 +295,29 @@ func (s *Server) handlePresales(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
+// handleCreatePresale — заведение новой карточки пресейла из интерфейса (Ф1).
+func (s *Server) handleCreatePresale(w http.ResponseWriter, r *http.Request) {
+	body, err := decode[model.Presale](r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	s.st.LockStore()
+	ps, err := s.st.CreatePresale(body)
+	s.st.UnlockStore()
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	s.st.RLockStore()
+	defer s.st.RUnlockStore()
+	stageByID := map[string]*model.Stage{}
+	for i := range s.st.Stages {
+		stageByID[s.st.Stages[i].ID] = &s.st.Stages[i]
+	}
+	writeJSON(w, 201, s.presaleView(ps, stageByID))
+}
+
 func (s *Server) handlePatchPresale(w http.ResponseWriter, r *http.Request) {
 	body, err := decode[struct {
 		StageID string `json:"stageId"`
@@ -361,8 +401,10 @@ func (s *Server) handleProject(w http.ResponseWriter, r *http.Request) {
 func (s *Server) buildCard(p *model.Project) projectCard {
 	dir := s.st.Dirs()
 	card := projectCard{
-		Project:  p,
-		Computed: engine.Compose(p, dir),
+		Project:        p,
+		Computed:       engine.Compose(p, dir),
+		Team:           []teamView{},        // пустой массив, а не null, если команда не назначена
+		ChangeRequests: []model.ChangeRequest{}, // аналогично для ЗИ проекта
 	}
 	card.Summary = engine.Summarize(p, dir)
 	if c, ok := s.st.Clients[p.ClientID]; ok {
