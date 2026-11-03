@@ -152,8 +152,12 @@ func (s *Server) handleDirectories(w http.ResponseWriter, r *http.Request) {
 	clients := sortedVals(s.st.Clients)
 	suppliers := sortedVals(s.st.Suppliers)
 	employees := sortedVals(s.st.Employees)
+	works := sortedVals(s.st.Works)
+	products := sortedVals(s.st.Products)
+	regions := sortedVals(s.st.Regions)
 	writeJSON(w, 200, map[string]any{
-		"clients": clients, "suppliers": suppliers, "employees": employees, "stages": s.st.Stages,
+		"clients": clients, "suppliers": suppliers, "employees": employees,
+		"works": works, "products": products, "regions": regions, "stages": s.st.Stages,
 	})
 }
 
@@ -190,6 +194,30 @@ func (s *Server) handleCreateDirectoryItem(w http.ResponseWriter, r *http.Reques
 			var pe *model.Employee
 			if pe, err = s.st.CreateEmployee(e); err == nil {
 				created = pe
+			}
+		}
+	case "works":
+		var w model.Work
+		if err = json.NewDecoder(r.Body).Decode(&w); err == nil {
+			var pw *model.Work
+			if pw, err = s.st.CreateWork(w); err == nil {
+				created = pw
+			}
+		}
+	case "products":
+		var p model.Product
+		if err = json.NewDecoder(r.Body).Decode(&p); err == nil {
+			var pp *model.Product
+			if pp, err = s.st.CreateProduct(p); err == nil {
+				created = pp
+			}
+		}
+	case "regions":
+		var rg model.Region
+		if err = json.NewDecoder(r.Body).Decode(&rg); err == nil {
+			var pr *model.Region
+			if pr, err = s.st.CreateRegion(rg); err == nil {
+				created = pr
 			}
 		}
 	default:

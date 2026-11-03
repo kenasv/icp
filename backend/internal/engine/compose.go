@@ -20,8 +20,9 @@ type ProjectSummary struct {
 	Name         string             `json:"name"`
 	ClientName   string             `json:"clientName"`
 	Status       model.ProjectStatus `json:"status"`
-	Amount       float64            `json:"amount"`
-	GMPlan       float64            `json:"gmPlan"`
+	Amount       float64            `json:"amount"`       // плановая выручка от проекта, млн ₽
+	PlannedCost  float64            `json:"plannedCost"`  // плановые затраты (состав работ/бюджет), млн ₽
+	GMPlan       float64            `json:"gmPlan"`       // (выручка − затраты) / выручка
 	GMForecast   float64            `json:"gmForecast"`
 	EndPlan      time.Time          `json:"endPlan"`
 	EndForecast  time.Time          `json:"endForecast"`
@@ -94,7 +95,10 @@ func Summarize(p *model.Project, dir *Directories) ProjectSummary {
 	s := ProjectSummary{
 		ID: p.ID, Name: p.Name, Status: p.Status,
 		Amount: p.ContractAmount, Note: p.Note,
-		GMPlan: pc.Finance.GM.Plan, GMForecast: pc.Finance.GM.Forecast,
+		// Плановые затраты = сумма помесячных планов затрат (для проектов из пресейла
+		// это суммы строк состава работ); GM план = (выручка − затраты) / выручка.
+		PlannedCost: pc.Finance.Cost.Total.Plan,
+		GMPlan:      pc.Finance.GM.Plan, GMForecast: pc.Finance.GM.Forecast,
 		Health: pc.Health.Overall, HealthReason: pc.Health.OverallReason,
 	}
 	if dir != nil {
@@ -104,7 +108,9 @@ func Summarize(p *model.Project, dir *Directories) ProjectSummary {
 	} else {
 		s.ClientName = p.ClientID
 	}
-	// Дата завершения — последняя веха (план из базового плана, прогноз — текущая).
+	// Дата завершения (прогноз): у проекта с составом работ — самая большая
+	// плановая дата строк состава (перенесён из пресейла); без состава —
+	// дата последней вехи графика (план — из базового плана).
 	var lastMile *WBSRow
 	for i := range pc.Schedule {
 		r := &pc.Schedule[i]
@@ -115,7 +121,25 @@ func Summarize(p *model.Project, dir *Directories) ProjectSummary {
 			lastMile = r
 		}
 	}
-	if lastMile != nil {
+	if len(p.Scope) > 0 {
+		maxDate := p.Scope[0].Date
+		for _, it := range p.Scope {
+			if it.Date.After(maxDate) {
+				maxDate = it.Date
+			}
+		}
+		s.EndForecast = maxDate
+		if lastMile != nil {
+			s.DevDays = lastMile.DevDays
+			if lastMile.HasBase {
+				s.EndPlan = lastMile.BaseEnd
+			} else {
+				s.EndPlan = lastMile.End
+			}
+		} else {
+			s.EndPlan = maxDate
+		}
+	} else if lastMile != nil {
 		s.EndForecast = lastMile.End
 		s.DevDays = lastMile.DevDays
 		if lastMile.HasBase {

@@ -13,6 +13,9 @@ func dt(y int, m time.Month, d int) time.Time { return model.NewDate(y, m, d) }
 
 func (s *Store) seed() {
 	s.seedDirectories()
+	s.seedWorks()
+	s.seedProducts()
+	s.seedRegions()
 	s.seedStages()
 	s.seedProject1()
 	s.seedProject2()
@@ -64,6 +67,112 @@ func (s *Store) seedDirectories() {
 	for _, e := range employees {
 		s.Employees[e.ID] = e
 	}
+}
+
+// seedWorks — справочник видов работ: из него на этапе пресейла набирается
+// состав работ планируемого проекта (дата + стоимость по каждой строке).
+func (s *Store) seedWorks() {
+	works := []model.Work{
+		{ID: "wrk-survey", Name: "Обследование объекта"},
+		{ID: "wrk-design", Name: "Проектирование решения"},
+		{ID: "wrk-supply", Name: "Поставка оборудования"},
+		{ID: "wrk-mount", Name: "Монтажные работы"},
+		{ID: "wrk-commiss", Name: "Пусконаладочные работы"},
+		{ID: "wrk-integr", Name: "Интеграция и тестирование"},
+		{ID: "wrk-train", Name: "Обучение персонала"},
+		{ID: "wrk-support", Name: "Техническая поддержка"},
+	}
+	for _, w := range works {
+		s.Works[w.ID] = w
+	}
+}
+
+// EnsureSeededWorks — после загрузки состояния из БД: если справочник видов работ
+// пуст (база создана до появления состава работ), дозаполняет его типовыми
+// позициями. Возвращает число добавленных записей.
+func (s *Store) EnsureSeededWorks() int {
+	works := []model.Work{
+		{ID: "wrk-survey", Name: "Обследование объекта"},
+		{ID: "wrk-design", Name: "Проектирование решения"},
+		{ID: "wrk-supply", Name: "Поставка оборудования"},
+		{ID: "wrk-mount", Name: "Монтажные работы"},
+		{ID: "wrk-commiss", Name: "Пусконаладочные работы"},
+		{ID: "wrk-integr", Name: "Интеграция и тестирование"},
+		{ID: "wrk-train", Name: "Обучение персонала"},
+		{ID: "wrk-support", Name: "Техническая поддержка"},
+	}
+	added := 0
+	for _, w := range works {
+		if _, ok := s.Works[w.ID]; !ok {
+			s.Works[w.ID] = w
+			added++
+		}
+	}
+	return added
+}
+
+// seedProducts — справочник продуктов: выбирается в карточке пресейла.
+func (s *Store) seedProducts() {
+	products := []model.Product{
+		{ID: "prd-shpd", Name: "ШПД"},
+		{ID: "prd-mobile", Name: "Мобильная связь"},
+		{ID: "prd-video", Name: "Видеонаблюдение"},
+		{ID: "prd-sec", Name: "Система безопасности"},
+	}
+	for _, p := range products {
+		s.Products[p.ID] = p
+	}
+}
+
+// seedRegions — справочник регионов: выбирается в карточке пресейла.
+func (s *Store) seedRegions() {
+	regions := []model.Region{
+		{ID: "reg-msk", Name: "Москва"},
+		{ID: "reg-spb", Name: "Санкт-Петербург"},
+		{ID: "reg-lip", Name: "Липецк"},
+		{ID: "reg-tula", Name: "Тула"},
+		{ID: "reg-cherep", Name: "Череповец"},
+		{ID: "reg-vlad", Name: "Владимир"},
+		{ID: "reg-voronezh", Name: "Воронеж"},
+	}
+	for _, r := range regions {
+		s.Regions[r.ID] = r
+	}
+}
+
+// EnsureSeededRefs — после загрузки состояния из БД дозаполняет пустые
+// справочники (виды работ, продукты, регионы) для баз, созданных раньше.
+// Возвращает суммарное число добавленных записей.
+func (s *Store) EnsureSeededRefs() int {
+	added := s.EnsureSeededWorks()
+	products := []model.Product{
+		{ID: "prd-shpd", Name: "ШПД"},
+		{ID: "prd-mobile", Name: "Мобильная связь"},
+		{ID: "prd-video", Name: "Видеонаблюдение"},
+		{ID: "prd-sec", Name: "Система безопасности"},
+	}
+	for _, p := range products {
+		if _, ok := s.Products[p.ID]; !ok {
+			s.Products[p.ID] = p
+			added++
+		}
+	}
+	regions := []model.Region{
+		{ID: "reg-msk", Name: "Москва"},
+		{ID: "reg-spb", Name: "Санкт-Петербург"},
+		{ID: "reg-lip", Name: "Липецк"},
+		{ID: "reg-tula", Name: "Тула"},
+		{ID: "reg-cherep", Name: "Череповец"},
+		{ID: "reg-vlad", Name: "Владимир"},
+		{ID: "reg-voronezh", Name: "Воронеж"},
+	}
+	for _, r := range regions {
+		if _, ok := s.Regions[r.ID]; !ok {
+			s.Regions[r.ID] = r
+			added++
+		}
+	}
+	return added
 }
 
 // seedStages — воронка (Ф2) + дополнительный этап «Тендер» из кейса №8.

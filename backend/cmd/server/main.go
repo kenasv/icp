@@ -42,6 +42,13 @@ func main() {
 			if err := database.LoadInto(st); err != nil {
 				log.Fatalf("PostgreSQL: загрузка состояния: %v", err)
 			}
+			// БД, созданная до появления состава работ/новых справочников, дозаполняется сидами.
+			if n := st.EnsureSeededRefs(); n > 0 {
+				if err := database.Sync(st); err != nil {
+					log.Fatalf("PostgreSQL: дозасев справочников: %v", err)
+				}
+				log.Printf("Справочники дозаполнены (%d позиций)", n)
+			}
 			log.Printf("Состояние загружено из PostgreSQL: %d проектов, %d пресейлов",
 				len(st.Projects), len(st.Presales))
 		} else {

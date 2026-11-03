@@ -144,7 +144,7 @@ export default function Dashboard() {
                   rowKey="id"
                   size="small"
                   dataSource={data.projects as any}
-                  scroll={{ x: 1150 }}
+                  scroll={{ x: 1250 }}
                   onRow={(r) => ({ onClick: () => navigate(`/projects/${r.id}`), style: { cursor: 'pointer' } })}
                   pagination={false}
                   columns={[
@@ -153,8 +153,10 @@ export default function Dashboard() {
                     { title: 'Клиент', dataIndex: 'clientName', width: 160 },
                     { title: 'Статус', dataIndex: 'status', width: 130,
                       render: (s: string) => <Tag color={s === 'В реализации' ? 'processing' : s === 'Планирование' ? 'default' : 'success'}>{s}</Tag> },
-                    { title: 'Сумма, млн ₽', dataIndex: 'amount', align: 'right' as const, width: 110,
+                    { title: 'Плановая выручка, млн ₽', dataIndex: 'amount', align: 'right' as const, width: 120,
                       render: (v: number) => v.toFixed(1).replace('.', ',') },
+                    { title: 'Плановые затраты, млн ₽', dataIndex: 'plannedCost', align: 'right' as const, width: 110,
+                      render: (v: number) => (v ?? 0).toFixed(1).replace('.', ',') },
                     { title: 'GM план', dataIndex: 'gmPlan', align: 'right' as const, width: 90, render: (v: number) => fmtPct(v, 0) },
                     { title: 'GM прогноз', dataIndex: 'gmForecast', align: 'right' as const, width: 100, render: (v: number) => fmtPct(v, 0) },
                     {

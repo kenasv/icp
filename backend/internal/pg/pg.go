@@ -31,7 +31,8 @@ func Open(dsn string) (*DB, error) {
 	return &DB{db}, nil
 }
 
-// EnsureSchema — создаёт таблицы, если их ещё нет (владелец схемы — бэкенд).
+// EnsureSchema — создаёт таблицы, если их ещё нет (владелец схемы — бэкенд);
+// докатывает миграции для таблиц, созданных раньше (напр., состав работ).
 func (d *DB) EnsureSchema() error {
 	const schema = `
 CREATE TABLE IF NOT EXISTS clients (
@@ -44,6 +45,15 @@ CREATE TABLE IF NOT EXISTS suppliers (
 CREATE TABLE IF NOT EXISTS employees (
   id text PRIMARY KEY, name text NOT NULL, position text NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS works (
+  id text PRIMARY KEY, name text NOT NULL
+);
+CREATE TABLE IF NOT EXISTS products (
+  id text PRIMARY KEY, name text NOT NULL
+);
+CREATE TABLE IF NOT EXISTS regions (
+  id text PRIMARY KEY, name text NOT NULL
+);
 CREATE TABLE IF NOT EXISTS stages (
   id text PRIMARY KEY, name text NOT NULL,
   probability double precision NOT NULL DEFAULT 0, sort_order int NOT NULL DEFAULT 0
@@ -53,7 +63,8 @@ CREATE TABLE IF NOT EXISTS presales (
   client_id text NOT NULL DEFAULT '', product text NOT NULL DEFAULT '', region text NOT NULL DEFAULT '',
   amount double precision NOT NULL DEFAULT 0, stage_id text NOT NULL DEFAULT '',
   probability_override double precision, team jsonb NOT NULL DEFAULT '[]',
-  lead_source text NOT NULL DEFAULT '', stage_history jsonb NOT NULL DEFAULT '[]',
+  lead_source text NOT NULL DEFAULT '', scope jsonb NOT NULL DEFAULT '[]',
+  stage_history jsonb NOT NULL DEFAULT '[]',
   project_id text NOT NULL DEFAULT '', converted_at timestamptz
 );
 CREATE TABLE IF NOT EXISTS projects (
@@ -63,7 +74,7 @@ CREATE TABLE IF NOT EXISTS projects (
   status text NOT NULL DEFAULT '', note text NOT NULL DEFAULT '', presale_id text NOT NULL DEFAULT '',
   team jsonb NOT NULL DEFAULT '[]', wbs jsonb NOT NULL DEFAULT '[]', budget jsonb NOT NULL DEFAULT '[]',
   purchases jsonb NOT NULL DEFAULT '[]', risks jsonb NOT NULL DEFAULT '[]', baselines jsonb NOT NULL DEFAULT '[]',
-  events jsonb NOT NULL DEFAULT '[]', scenarios jsonb NOT NULL DEFAULT '[]'
+  events jsonb NOT NULL DEFAULT '[]', scenarios jsonb NOT NULL DEFAULT '[]', scope jsonb NOT NULL DEFAULT '[]'
 );
 CREATE TABLE IF NOT EXISTS change_requests (
   id text PRIMARY KEY, project_id text NOT NULL DEFAULT '', type text NOT NULL DEFAULT '',
@@ -76,7 +87,15 @@ CREATE TABLE IF NOT EXISTS bpmn (
   key text PRIMARY KEY, xml text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now()
 );
 `
-	_, err := d.db.Exec(schema)
+	// Миграция существующих таблиц (демо-БД создавалась до появления состава работ).
+	const migration = `
+ALTER TABLE presales ADD COLUMN IF NOT EXISTS scope jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS scope jsonb NOT NULL DEFAULT '[]';
+`
+	if _, err := d.db.Exec(schema); err != nil {
+		return err
+	}
+	_, err := d.db.Exec(migration)
 	return err
 }
 
@@ -106,7 +125,7 @@ func (d *DB) Sync(s *store.Store) error {
 	}
 	defer tx.Rollback()
 
-	for _, t := range []string{"clients", "suppliers", "employees", "stages", "presales", "projects", "change_requests", "bpmn"} {
+	for _, t := range []string{"clients", "suppliers", "employees", "works", "products", "regions", "stages", "presales", "projects", "change_requests", "bpmn"} {
 		if _, err := tx.Exec("DELETE FROM " + t); err != nil {
 			return fmt.Errorf("очистка %s: %w", t, err)
 		}
@@ -128,6 +147,21 @@ func (d *DB) Sync(s *store.Store) error {
 			return err
 		}
 	}
+	for _, w := range s.Works {
+		if _, err := tx.Exec(`INSERT INTO works (id, name) VALUES ($1,$2)`, w.ID, w.Name); err != nil {
+			return err
+		}
+	}
+	for _, p := range s.Products {
+		if _, err := tx.Exec(`INSERT INTO products (id, name) VALUES ($1,$2)`, p.ID, p.Name); err != nil {
+			return err
+		}
+	}
+	for _, r := range s.Regions {
+		if _, err := tx.Exec(`INSERT INTO regions (id, name) VALUES ($1,$2)`, r.ID, r.Name); err != nil {
+			return err
+		}
+	}
 	for _, st := range s.Stages {
 		if _, err := tx.Exec(`INSERT INTO stages (id, name, probability, sort_order) VALUES ($1,$2,$3,$4)`,
 			st.ID, st.Name, st.Probability, st.Order); err != nil {
@@ -137,12 +171,13 @@ func (d *DB) Sync(s *store.Store) error {
 	for _, ps := range s.Presales {
 		team, _ := json.Marshal(ps.Team)
 		hist, _ := json.Marshal(ps.StageHistory)
+		scope, _ := json.Marshal(ps.Scope)
 		if _, err := tx.Exec(`
 INSERT INTO presales (id, number, name, client_id, product, region, amount, stage_id,
-  probability_override, team, lead_source, stage_history, project_id, converted_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+  probability_override, team, lead_source, scope, stage_history, project_id, converted_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
 			ps.ID, ps.Number, ps.Name, ps.ClientID, ps.Product, ps.Region, ps.Amount, ps.StageID,
-			ps.ProbabilityOverride, team, ps.LeadSource, hist, ps.ProjectID, ps.ConvertedAt); err != nil {
+			ps.ProbabilityOverride, team, ps.LeadSource, scope, hist, ps.ProjectID, ps.ConvertedAt); err != nil {
 			return err
 		}
 	}
@@ -173,11 +208,11 @@ func insertProject(tx *sql.Tx, p *model.Project) error {
 	mustJSON := func(v any) []byte { b, _ := json.Marshal(v); return b }
 	_, err := tx.Exec(`
 INSERT INTO projects (id, name, client_id, product, region, type, contract_amount, status, note, presale_id,
-  team, wbs, budget, purchases, risks, baselines, events, scenarios)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+  team, wbs, budget, purchases, risks, baselines, events, scenarios, scope)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
 		p.ID, p.Name, p.ClientID, p.Product, p.Region, p.Type, p.ContractAmount, p.Status, p.Note, p.PresaleID,
 		mustJSON(p.Team), mustJSON(p.WBS), mustJSON(p.Budget), mustJSON(p.Purchases),
-		mustJSON(p.Risks), mustJSON(p.Baselines), mustJSON(p.Events), mustJSON(p.Scenarios))
+		mustJSON(p.Risks), mustJSON(p.Baselines), mustJSON(p.Events), mustJSON(p.Scenarios), mustJSON(p.Scope))
 	return err
 }
 
@@ -247,24 +282,77 @@ func (d *DB) LoadInto(s *store.Store) error {
 		return err
 	}
 
+	rowsW, err := d.db.Query(`SELECT id, name FROM works`)
+	if err != nil {
+		return err
+	}
+	defer rowsW.Close()
+	for rowsW.Next() {
+		var w model.Work
+		if err := rowsW.Scan(&w.ID, &w.Name); err != nil {
+			return err
+		}
+		s.Works[w.ID] = w
+	}
+	if err := rowsW.Err(); err != nil {
+		return err
+	}
+
+	rowsPr, err := d.db.Query(`SELECT id, name FROM products`)
+	if err != nil {
+		return err
+	}
+	defer rowsPr.Close()
+	for rowsPr.Next() {
+		var p model.Product
+		if err := rowsPr.Scan(&p.ID, &p.Name); err != nil {
+			return err
+		}
+		s.Products[p.ID] = p
+	}
+	if err := rowsPr.Err(); err != nil {
+		return err
+	}
+
+	rowsRg, err := d.db.Query(`SELECT id, name FROM regions`)
+	if err != nil {
+		return err
+	}
+	defer rowsRg.Close()
+	for rowsRg.Next() {
+		var r model.Region
+		if err := rowsRg.Scan(&r.ID, &r.Name); err != nil {
+			return err
+		}
+		s.Regions[r.ID] = r
+	}
+	if err := rowsRg.Err(); err != nil {
+		return err
+	}
+
 	rows5, err := d.db.Query(`
 SELECT id, number, name, client_id, product, region, amount, stage_id,
-  probability_override, team, lead_source, stage_history, project_id, converted_at FROM presales`)
+  probability_override, team, lead_source, scope, stage_history, project_id, converted_at FROM presales`)
 	if err != nil {
 		return err
 	}
 	defer rows5.Close()
 	for rows5.Next() {
 		ps := &model.Presale{}
-		var team, hist []byte
+		var team, scope, hist []byte
 		if err := rows5.Scan(&ps.ID, &ps.Number, &ps.Name, &ps.ClientID, &ps.Product, &ps.Region,
-			&ps.Amount, &ps.StageID, &ps.ProbabilityOverride, &team, &ps.LeadSource, &hist,
+			&ps.Amount, &ps.StageID, &ps.ProbabilityOverride, &team, &ps.LeadSource, &scope, &hist,
 			&ps.ProjectID, &ps.ConvertedAt); err != nil {
 			return err
 		}
 		if len(team) > 0 {
 			if err := json.Unmarshal(team, &ps.Team); err != nil {
 				return fmt.Errorf("пресейл %s: team: %w", ps.ID, err)
+			}
+		}
+		if len(scope) > 0 {
+			if err := json.Unmarshal(scope, &ps.Scope); err != nil {
+				return fmt.Errorf("пресейл %s: scope: %w", ps.ID, err)
 			}
 		}
 		if len(hist) > 0 {
@@ -280,17 +368,17 @@ SELECT id, number, name, client_id, product, region, amount, stage_id,
 
 	rows6, err := d.db.Query(`
 SELECT id, name, client_id, product, region, type, contract_amount, status, note, presale_id,
-  team, wbs, budget, purchases, risks, baselines, events, scenarios FROM projects`)
+  team, wbs, budget, purchases, risks, baselines, events, scenarios, scope FROM projects`)
 	if err != nil {
 		return err
 	}
 	defer rows6.Close()
 	for rows6.Next() {
 		p := &model.Project{}
-		var team, wbs, budget, purchases, risks, baselines, events, scenarios []byte
+		var team, wbs, budget, purchases, risks, baselines, events, scenarios, scope []byte
 		if err := rows6.Scan(&p.ID, &p.Name, &p.ClientID, &p.Product, &p.Region, &p.Type,
 			&p.ContractAmount, &p.Status, &p.Note, &p.PresaleID,
-			&team, &wbs, &budget, &purchases, &risks, &baselines, &events, &scenarios); err != nil {
+			&team, &wbs, &budget, &purchases, &risks, &baselines, &events, &scenarios, &scope); err != nil {
 			return err
 		}
 		for _, pair := range []struct {
@@ -299,6 +387,7 @@ SELECT id, name, client_id, product, region, type, contract_amount, status, note
 		}{
 			{team, &p.Team}, {wbs, &p.WBS}, {budget, &p.Budget}, {purchases, &p.Purchases},
 			{risks, &p.Risks}, {baselines, &p.Baselines}, {events, &p.Events}, {scenarios, &p.Scenarios},
+			{scope, &p.Scope},
 		} {
 			if len(pair.raw) > 0 {
 				if err := json.Unmarshal(pair.raw, pair.dst); err != nil {

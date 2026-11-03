@@ -25,7 +25,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   meta: () => req<any>('/meta'),
   directories: () => req<any>('/directories'),
-  createDirectoryItem: (entity: 'clients' | 'suppliers' | 'employees', body: any) =>
+  createDirectoryItem: (entity: 'clients' | 'suppliers' | 'employees' | 'works' | 'products' | 'regions', body: any) =>
     req<any>(`/directories/${entity}`, { method: 'POST', body: JSON.stringify(body) }),
 
   portfolio: () => req<Portfolio>('/portfolio'),
@@ -34,6 +34,7 @@ export const api = {
   createPresale: (body: {
     name: string; clientId: string; product?: string; region?: string;
     amount: number; stageId: string; leadSource?: string; team?: string[];
+    scope?: { workId: string; date: string; cost: number }[];
   }) => req<PresaleView>('/presales', { method: 'POST', body: JSON.stringify(body) }),
   movePresale: (id: string, stageId: string) =>
     req<PresaleView>(`/presales/${id}`, { method: 'PATCH', body: JSON.stringify({ stageId }) }),

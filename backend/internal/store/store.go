@@ -21,6 +21,9 @@ type Store struct {
 	Clients        map[string]model.Client
 	Suppliers      map[string]model.Supplier
 	Employees      map[string]model.Employee
+	Works          map[string]model.Work
+	Products       map[string]model.Product
+	Regions        map[string]model.Region
 	Stages         []model.Stage
 	Presales       map[string]*model.Presale
 	Projects       map[string]*model.Project
@@ -35,6 +38,9 @@ func NewEmpty() *Store {
 		Clients:        map[string]model.Client{},
 		Suppliers:      map[string]model.Supplier{},
 		Employees:      map[string]model.Employee{},
+		Works:          map[string]model.Work{},
+		Products:       map[string]model.Product{},
+		Regions:        map[string]model.Region{},
 		Presales:       map[string]*model.Presale{},
 		Projects:       map[string]*model.Project{},
 		ChangeRequests: map[string]*model.ChangeRequest{},
@@ -150,6 +156,60 @@ func (s *Store) CreateEmployee(e model.Employee) (*model.Employee, error) {
 	return &e, nil
 }
 
+// CreateWork — новая позиция справочника видов работ (состав работ планируемого проекта).
+func (s *Store) CreateWork(w model.Work) (*model.Work, error) {
+	w.Name = strings.TrimSpace(w.Name)
+	if w.Name == "" {
+		return nil, fmt.Errorf("укажите наименование вида работ")
+	}
+	for _, v := range s.Works {
+		if v.Name == w.Name {
+			return nil, fmt.Errorf("вид работ «%s» уже есть в справочнике", w.Name)
+		}
+	}
+	if w.ID == "" {
+		w.ID = nextMapID(s.Works, "wrk")
+	}
+	s.Works[w.ID] = w
+	return &w, nil
+}
+
+// CreateProduct — новая позиция справочника продуктов.
+func (s *Store) CreateProduct(p model.Product) (*model.Product, error) {
+	p.Name = strings.TrimSpace(p.Name)
+	if p.Name == "" {
+		return nil, fmt.Errorf("укажите наименование продукта")
+	}
+	for _, v := range s.Products {
+		if v.Name == p.Name {
+			return nil, fmt.Errorf("продукт «%s» уже есть в справочнике", p.Name)
+		}
+	}
+	if p.ID == "" {
+		p.ID = nextMapID(s.Products, "prd")
+	}
+	s.Products[p.ID] = p
+	return &p, nil
+}
+
+// CreateRegion — новая позиция справочника регионов.
+func (s *Store) CreateRegion(r model.Region) (*model.Region, error) {
+	r.Name = strings.TrimSpace(r.Name)
+	if r.Name == "" {
+		return nil, fmt.Errorf("укажите наименование региона")
+	}
+	for _, v := range s.Regions {
+		if v.Name == r.Name {
+			return nil, fmt.Errorf("регион «%s» уже есть в справочнике", r.Name)
+		}
+	}
+	if r.ID == "" {
+		r.ID = nextMapID(s.Regions, "reg")
+	}
+	s.Regions[r.ID] = r
+	return &r, nil
+}
+
 // ============ События ============
 
 // AddEvent — запись в ленту здоровья проекта.
@@ -187,7 +247,23 @@ func (s *Store) CreatePresale(ps model.Presale) (*model.Presale, error) {
 		return nil, fmt.Errorf("неизвестный этап воронки: %s", ps.StageID)
 	}
 	if ps.Amount <= 0 {
-		return nil, fmt.Errorf("сумма должна быть больше нуля")
+		return nil, fmt.Errorf("плановая выручка от проекта должна быть больше нуля")
+	}
+	// Состав работ планируемого проекта: строки из справочника видов работ
+	// с плановой датой реализации и плановой стоимостью.
+	for i := range ps.Scope {
+		it := &ps.Scope[i]
+		w, ok := s.Works[it.WorkID]
+		if !ok {
+			return nil, fmt.Errorf("строка состава работ %d: вид работ не найден в справочнике", i+1)
+		}
+		it.Name = w.Name
+		if it.Date.IsZero() {
+			return nil, fmt.Errorf("строка состава работ «%s»: укажите плановую дату реализации", w.Name)
+		}
+		if it.Cost <= 0 {
+			return nil, fmt.Errorf("строка состава работ «%s»: укажите плановую стоимость", w.Name)
+		}
 	}
 	// Следующий свободный номер ПС-ГГГГ-NNN.
 	max := 0
@@ -205,6 +281,9 @@ func (s *Store) CreatePresale(ps model.Presale) (*model.Presale, error) {
 	ps.StageHistory = []model.StageChange{{
 		Date: model.DemoNow, ToStage: ps.StageID, Comment: "Карточка создана в интерфейсе",
 	}}
+	if ps.Scope == nil {
+		ps.Scope = []model.ScopeItem{}
+	}
 	if ps.LeadSource == "" {
 		ps.LeadSource = "Прочее"
 	}
@@ -252,12 +331,36 @@ func (s *Store) ConvertPresale(id string) (*model.Project, error) {
 		PresaleID:      ps.ID,
 		Note:           "Передан из пресейла " + ps.Number,
 	}
-	// Бюджет-заготовка: вся сумма как плановая выручка (детализация — на планировании).
-	p.Budget = []model.BudgetItem{{
-		ID: "B-" + num + "-REV", ProjectID: p.ID, IsRevenue: true,
-		Article: model.ArticleRevenue, Plan: map[string]float64{},
-		Note: "Заготовка из пресейла: " + fmt.Sprintf("%.1f", ps.Amount) + " млн ₽",
-	}}
+	// Состав работ переносится в проект (Ф6); плановые затраты строк становятся
+	// статьями бюджета, а плановая выручка ложится в месяц последней работы.
+	p.Scope = append([]model.ScopeItem{}, ps.Scope...)
+	if len(ps.Scope) > 0 {
+		lastMonth := ps.Scope[0].Date
+		for _, it := range ps.Scope {
+			if it.Date.After(lastMonth) {
+				lastMonth = it.Date
+			}
+		}
+		p.Budget = []model.BudgetItem{{
+			ID: "B-" + num + "-REV", ProjectID: p.ID, IsRevenue: true,
+			Article: model.ArticleRevenue, Plan: map[string]float64{model.MonthKey(lastMonth): ps.Amount},
+			Note: "Заготовка из пресейла: плановая выручка " + fmt.Sprintf("%.1f", ps.Amount) + " млн ₽ (месяц последней работы)",
+		}}
+		for i, it := range ps.Scope {
+			p.Budget = append(p.Budget, model.BudgetItem{
+				ID: fmt.Sprintf("B-%s-C%02d", num, i+1), ProjectID: p.ID,
+				Article: model.ArticleWorks, Plan: map[string]float64{model.MonthKey(it.Date): it.Cost},
+				Note: "Из состава работ пресейла: " + it.Name,
+			})
+		}
+	} else {
+		// Без состава работ — выручка-заготовка без помесячной детализации.
+		p.Budget = []model.BudgetItem{{
+			ID: "B-" + num + "-REV", ProjectID: p.ID, IsRevenue: true,
+			Article: model.ArticleRevenue, Plan: map[string]float64{},
+			Note: "Заготовка из пресейла: " + fmt.Sprintf("%.1f", ps.Amount) + " млн ₽",
+		}}
+	}
 	// Минимальная СДР стадии планирования.
 	p.WBS = []model.WBSItem{
 		{ID: "PH-" + num, Type: model.WBSPhase, Name: "Планирование"},

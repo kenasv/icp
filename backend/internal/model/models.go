@@ -42,6 +42,18 @@ type Employee struct {
 	Position string `json:"position"` // РП | Инженер | Менеджер по закупкам | Директор департамента
 }
 
+// Product — позиция справочника продуктов: выбирается в карточке пресейла.
+type Product struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Region — позиция справочника регионов: выбирается в карточке пресейла.
+type Region struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // ============ Пресейл и воронка (Ф1–Ф6) ============
 
 // Stage — этап воронки. Вероятность этапа используется по умолчанию,
@@ -51,6 +63,32 @@ type Stage struct {
 	Name         string  `json:"name"`
 	Probability  float64 `json:"probability"` // 0..1
 	Order        int     `json:"order"`
+}
+
+// Work — позиция справочника видов работ: из него набирается состав работ
+// планируемого проекта на этапе пресейла.
+type Work struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ScopeItem — строка состава работ планируемого проекта: вид работ из справочника,
+// плановая дата реализации и плановая стоимость (млн ₽). Заполняется в пресейле,
+// при передаче в проект переносится и превращается в статьи бюджета затрат.
+type ScopeItem struct {
+	WorkID string    `json:"workId"`
+	Name   string    `json:"name"`
+	Date   time.Time `json:"date"`
+	Cost   float64   `json:"cost"`
+}
+
+// ScopeCost — суммарные плановые затраты по составу работ.
+func ScopeCost(items []ScopeItem) float64 {
+	s := 0.0
+	for _, it := range items {
+		s += it.Cost
+	}
+	return s
 }
 
 type StageChange struct {
@@ -67,11 +105,12 @@ type Presale struct {
 	ClientID             string        `json:"clientId"`
 	Product              string        `json:"product"`
 	Region               string        `json:"region"`
-	Amount               float64       `json:"amount"` // млн ₽
+	Amount               float64       `json:"amount"` // плановая выручка от проекта, млн ₽
 	StageID              string        `json:"stageId"`
 	ProbabilityOverride  *float64      `json:"probabilityOverride,omitempty"` // 0..1
 	Team                 []string      `json:"team"`                         // ID сотрудников
 	LeadSource           string        `json:"leadSource"`
+	Scope                []ScopeItem   `json:"scope"` // состав работ планируемого проекта
 	StageHistory         []StageChange `json:"stageHistory"`
 	ProjectID            string        `json:"projectId,omitempty"` // связь «пресейл → проект»
 	ConvertedAt          *time.Time    `json:"convertedAt,omitempty"`
@@ -106,10 +145,11 @@ type Project struct {
 	Product        string        `json:"product"`
 	Region         string        `json:"region"`
 	Type           string        `json:"type"`
-	ContractAmount float64       `json:"contractAmount"` // млн ₽
+	ContractAmount float64       `json:"contractAmount"` // плановая выручка от проекта, млн ₽
 	Status         ProjectStatus `json:"status"`
 	Note           string        `json:"note,omitempty"` // примечание для реестра портфеля
 	PresaleID      string        `json:"presaleId"` // связка пресейл—проект обязательна (Ф7)
+	Scope          []ScopeItem   `json:"scope"`     // состав работ (переносится из пресейла, Ф6)
 	Team           []TeamMember  `json:"team"`
 	WBS            []WBSItem     `json:"wbs"`
 	Budget         []BudgetItem  `json:"budget"`
@@ -147,6 +187,9 @@ func (p *Project) EnsureSlices() {
 	}
 	if p.Scenarios == nil {
 		p.Scenarios = []Scenario{}
+	}
+	if p.Scope == nil {
+		p.Scope = []ScopeItem{}
 	}
 }
 

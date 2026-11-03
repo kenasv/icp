@@ -7,6 +7,13 @@ export interface Client { id: string; name: string; inn: string; segment: string
 export interface Supplier { id: string; name: string }
 export interface Employee { id: string; name: string; position: string }
 export interface Stage { id: string; name: string; probability: number; order: number }
+export interface Work { id: string; name: string }
+export interface Product { id: string; name: string }
+export interface Region { id: string; name: string }
+
+// Строка состава работ планируемого проекта: вид работ из справочника,
+// плановая дата реализации и плановая стоимость (млн ₽).
+export interface ScopeItem { workId: string; name: string; date: string; cost: number }
 
 export interface StageChange { date: string; fromStage: string; toStage: string; comment?: string }
 
@@ -14,7 +21,7 @@ export interface PresaleView {
   id: string; number: string; name: string; clientId: string; clientName: string
   product: string; region: string; amount: number; stageId: string; stageName: string
   probability: number; weighted: number; team: string[]; leadSource: string
-  stageHistory: StageChange[]; projectId?: string; convertedAt?: string
+  scope: ScopeItem[]; stageHistory: StageChange[]; projectId?: string; convertedAt?: string
 }
 
 export interface Dependency { fromId: string; lagDays: number }
@@ -79,7 +86,7 @@ export interface CascadeComputed {
 
 export interface ProjectSummary {
   id: string; name: string; clientName: string; status: string; amount: number
-  gmPlan: number; gmForecast: number; endPlan: string; endForecast: string
+  plannedCost: number; gmPlan: number; gmForecast: number; endPlan: string; endForecast: string
   devDays: number; health: Zone; healthReason: string; note: string
 }
 

@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, message, Modal, Select, Table, Tabs, Tag, Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { api } from '../api'
-import type { Client, Supplier, Employee, Stage } from '../types'
+import type { Client, Supplier, Employee, Stage, Work, Product, Region } from '../types'
 import { fmtPct } from '../format'
 
-// Справочники (Ф12): клиенты, поставщики, сотрудники — предзагруженные демо-данные
-// плюс заведение новых позиций из интерфейса (хранение — PostgreSQL).
+// Справочники (Ф12): клиенты, поставщики, сотрудники, виды работ, продукты, регионы —
+// предзагруженные демо-данные плюс заведение новых позиций из интерфейса (хранение — PostgreSQL).
 // Этапы воронки не редактируются: их вероятности связаны с расчётным движком (Ф2).
 const POSITIONS = ['РП', 'Директор департамента', 'Инженер', 'Менеджер по закупкам']
-type Entity = 'clients' | 'suppliers' | 'employees'
+type Entity = 'clients' | 'suppliers' | 'employees' | 'works' | 'products' | 'regions'
 
 export default function Directories() {
   const [data, setData] = useState<{
     clients: Client[]; suppliers: Supplier[]; employees: Employee[]; stages: Stage[]
+    works: Work[]; products: Product[]; regions: Region[]
   } | null>(null)
   const [entity, setEntity] = useState<Entity | null>(null)
   const [saving, setSaving] = useState(false)
@@ -57,6 +58,9 @@ export default function Directories() {
     clients: 'клиента',
     suppliers: 'поставщика',
     employees: 'сотрудника',
+    works: 'вид работ',
+    products: 'продукт',
+    regions: 'регион',
   }
 
   return (
@@ -103,6 +107,49 @@ export default function Directories() {
                   { title: 'Должность', dataIndex: 'position', width: 240,
                     render: (p: string) => <Tag color={p === 'РП' ? 'green' : p === 'Директор департамента' ? 'geekblue' : 'default'}>{p}</Tag> },
                 ]} />
+              </>
+            ),
+          },
+          {
+            key: 'works',
+            label: `Виды работ (${data.works.length})`,
+            children: (
+              <>
+                {addBtn('works', 'Добавить вид работ')}
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                  Из этого справочника набирается состав работ планируемого проекта
+                  в карточке пресейла (дата и стоимость — по каждой строке).
+                </Typography.Paragraph>
+                <Table<Work> rowKey="id" size="small" dataSource={data.works} pagination={false}
+                columns={[{ title: 'Вид работ', dataIndex: 'name' }]} />
+              </>
+            ),
+          },
+          {
+            key: 'products',
+            label: `Продукты (${data.products.length})`,
+            children: (
+              <>
+                {addBtn('products', 'Добавить продукт')}
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                  Продукт пресейла выбирается из этого справочника при создании карточки.
+                </Typography.Paragraph>
+                <Table<Product> rowKey="id" size="small" dataSource={data.products} pagination={false}
+                columns={[{ title: 'Продукт', dataIndex: 'name' }]} />
+              </>
+            ),
+          },
+          {
+            key: 'regions',
+            label: `Регионы (${data.regions.length})`,
+            children: (
+              <>
+                {addBtn('regions', 'Добавить регион')}
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
+                  Регион пресейла выбирается из этого справочника при создании карточки.
+                </Typography.Paragraph>
+                <Table<Region> rowKey="id" size="small" dataSource={data.regions} pagination={false}
+                columns={[{ title: 'Регион', dataIndex: 'name' }]} />
               </>
             ),
           },

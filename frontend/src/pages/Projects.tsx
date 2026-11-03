@@ -23,7 +23,7 @@ export default function Projects() {
         size="small"
         dataSource={rows}
         pagination={false}
-        scroll={{ x: 1150 }}
+        scroll={{ x: 1250 }}
         onRow={(r) => ({ onClick: () => navigate(`/projects/${r.id}`), style: { cursor: 'pointer' } })}
         columns={[
           { title: 'Номер', dataIndex: 'id', width: 130 },
@@ -35,8 +35,10 @@ export default function Projects() {
               <Tag color={s === 'В реализации' ? 'processing' : s === 'Планирование' ? 'default' : 'success'}>{s}</Tag>
             ),
           },
-          { title: 'Сумма', dataIndex: 'amount', align: 'right' as const, width: 100,
+          { title: 'Плановая выручка от проекта, млн ₽', dataIndex: 'amount', align: 'right' as const, width: 150,
             render: (v: number) => v.toFixed(1).replace('.', ',') },
+          { title: 'Плановые затраты, млн ₽', dataIndex: 'plannedCost', align: 'right' as const, width: 120,
+            render: (v: number) => (v ?? 0).toFixed(1).replace('.', ',') },
           { title: 'GM план', dataIndex: 'gmPlan', align: 'right' as const, width: 90, render: (v: number) => fmtPct(v, 0) },
           { title: 'GM прогноз', dataIndex: 'gmForecast', align: 'right' as const, width: 100, render: (v: number) => fmtPct(v, 0) },
           { title: 'Завершение (прогноз)', dataIndex: 'endForecast', width: 140, render: (v: string) => fmtDate(v) },

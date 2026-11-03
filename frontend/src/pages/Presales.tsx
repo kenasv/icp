@@ -1,27 +1,30 @@
 import { useEffect, useState } from 'react'
 import {
   Card, Typography, Tag, Drawer, Descriptions, Timeline, Button, message, Tooltip, Input, Modal,
-  Form, Select, InputNumber, Space,
+  Form, Select, InputNumber, DatePicker, Space,
 } from 'antd'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { ArrowRightOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { ArrowRightOutlined, DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { api } from '../api'
-import type { PresaleView, Stage, Client, Employee } from '../types'
+import type { PresaleView, Stage, Client, Employee, Work, Product, Region } from '../types'
 import { fmtDate, fmtMoney } from '../format'
 import { useNavigate } from 'react-router-dom'
 
 // Воронка пресейлов (Ф1–Ф6): канбан с перетаскиванием между этапами;
 // при смене этапа вероятность и взвешенная сумма пересчитываются (Ф3),
 // метрики этапов — над колонками (Ф4), передача в проект одной кнопкой (Ф6),
-// заведение новой карточки пресейла — кнопка «Новый пресейл» (Ф1).
+// заведение новой карточки пресейла с составом работ планируемого проекта (Ф1).
 export default function Presales() {
   const [presales, setPresales] = useState<PresaleView[]>([])
   const [stages, setStages] = useState<Stage[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [works, setWorks] = useState<Work[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [regions, setRegions] = useState<Region[]>([])
   const [selected, setSelected] = useState<PresaleView | null>(null)
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -37,15 +40,24 @@ export default function Presales() {
       setStages(d.stages)
       setClients(d.clients)
       setEmployees(d.employees)
+      setWorks(d.works)
+      setProducts(d.products)
+      setRegions(d.regions)
     })
   }
   useEffect(() => { load() }, [])
 
   // Создание карточки пресейла (Ф1): номер и история присваиваются на бэкенде.
+  // Даты строк состава работ уходят в ISO (бэкенд ждёт RFC3339).
   const createPresale = async (vals: any) => {
     setCreating(true)
     try {
-      const ps = await api.createPresale(vals)
+      const scope = (vals.scope || []).map((s: any) => ({
+        workId: s.workId,
+        date: s.date?.toISOString ? s.date.toISOString() : s.date,
+        cost: s.cost,
+      }))
+      const ps = await api.createPresale({ ...vals, scope })
       message.success(`Создан пресейл ${ps.number} «${ps.name}» на этапе ${ps.stageName}`)
       setCreateOpen(false)
       form.resetFields()
@@ -176,7 +188,7 @@ export default function Presales() {
               <Descriptions.Item label="Клиент">{selected.clientName}</Descriptions.Item>
               <Descriptions.Item label="Продукт">{selected.product}</Descriptions.Item>
               <Descriptions.Item label="Регион">{selected.region}</Descriptions.Item>
-              <Descriptions.Item label="Сумма">{fmtMoney(selected.amount)}</Descriptions.Item>
+              <Descriptions.Item label="Плановая выручка от проекта">{fmtMoney(selected.amount)} млн ₽</Descriptions.Item>
               <Descriptions.Item label="Этап воронки">
                 {selected.stageName} · вероятность {(selected.probability * 100).toFixed(0)}%
               </Descriptions.Item>
@@ -191,6 +203,42 @@ export default function Presales() {
                 )}
               </Descriptions.Item>
             </Descriptions>
+
+            {selected.scope?.length > 0 && (
+              <>
+                <Typography.Title level={5} style={{ marginTop: 16 }}>
+                  Состав работ планируемого проекта
+                </Typography.Title>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid #f0f0f0' }}>
+                      <th style={{ padding: '4px 8px' }}>Работа</th>
+                      <th style={{ padding: '4px 8px' }}>План. дата</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'right' }}>Стоимость, млн ₽</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selected.scope.map((it, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                        <td style={{ padding: '4px 8px' }}>{it.name}</td>
+                        <td style={{ padding: '4px 8px' }}>{fmtDate(it.date)}</td>
+                        <td style={{ padding: '4px 8px', textAlign: 'right' }}>
+                          {it.cost.toFixed(1).replace('.', ',')}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td style={{ padding: '6px 8px', fontWeight: 600 }} colSpan={2}>
+                        Плановые затраты (сумма)
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>
+                        {selected.scope.reduce((s, it) => s + it.cost, 0).toFixed(1).replace('.', ',')}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            )}
 
             <Typography.Title level={5} style={{ marginTop: 16 }}>История изменений этапа (Ф1)</Typography.Title>
             <Timeline
@@ -238,24 +286,94 @@ export default function Presales() {
           </Form.Item>
           <Space wrap style={{ display: 'flex' }}>
             <Form.Item name="product" label="Продукт" style={{ minWidth: 220 }}>
-              <Input placeholder="Продукт / решение" />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                allowClear
+                placeholder="Продукт из справочника"
+                options={products.map((p) => ({ value: p.name, label: p.name }))}
+              />
             </Form.Item>
             <Form.Item name="region" label="Регион" style={{ minWidth: 180 }}>
-              <Input placeholder="Регион" />
+              <Select
+                showSearch
+                optionFilterProp="label"
+                allowClear
+                placeholder="Регион из справочника"
+                options={regions.map((r) => ({ value: r.name, label: r.name }))}
+              />
             </Form.Item>
-            <Form.Item name="amount" label="Сумма, млн ₽" rules={[{ required: true, message: 'Укажите сумму' }]}>
-              <InputNumber min={0.1} step={0.5} style={{ width: 140 }} />
+            <Form.Item
+              name="amount"
+              label="Плановая выручка от проекта, млн ₽"
+              rules={[{ required: true, message: 'Укажите плановую выручку' }]}
+            >
+              <InputNumber min={0.1} step={0.5} style={{ width: 160 }} />
             </Form.Item>
           </Space>
-          <Form.Item name="stageId" label="Этап воронки" rules={[{ required: true, message: 'Выберите этап' }]}>
-            <Select
-              placeholder="Этап"
-              options={stages.map((s) => ({
-                value: s.id,
-                label: `${s.name} · вероятность ${Math.round(s.probability * 100)}%`,
-              }))}
-            />
+
+          <Form.Item label="Этап воронки" required style={{ marginBottom: 8 }}>
+            <Form.Item name="stageId" noStyle rules={[{ required: true, message: 'Выберите этап' }]}>
+              <Select
+                placeholder="Этап"
+                options={stages.map((s) => ({
+                  value: s.id,
+                  label: `${s.name} · вероятность ${Math.round(s.probability * 100)}%`,
+                }))}
+              />
+            </Form.Item>
           </Form.Item>
+
+          {/* Состав работ планируемого проекта: строки из справочника видов работ */}
+          <Typography.Text strong>Состав работ планируемого проекта</Typography.Text>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+            Для каждой строки — плановая дата реализации и плановая стоимость. Виды работ берутся
+            из справочника (вкладка «Справочники → Виды работ»). Сумма затрат переносится в проект
+            при передаче пресейла в реализацию и участвует в расчёте GM план.
+          </Typography.Paragraph>
+          <Form.List name="scope">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((f) => (
+                  <Space key={f.key} wrap align="baseline" style={{ display: 'flex', marginBottom: 4 }}>
+                    <Form.Item
+                      name={[f.name, 'workId']}
+                      rules={[{ required: true, message: 'Выберите работу' }]}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <Select
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="Вид работ из справочника"
+                        style={{ width: 'min(280px, calc(100vw - 120px))' }}
+                        options={works.map((w) => ({ value: w.id, label: w.name }))}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name={[f.name, 'date']}
+                      rules={[{ required: true, message: 'Дата реализации' }]}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <DatePicker placeholder="План. дата" style={{ width: 140 }} />
+                    </Form.Item>
+                    <Form.Item
+                      name={[f.name, 'cost']}
+                      rules={[{ required: true, message: 'Стоимость' }]}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <InputNumber min={0.1} step={0.5} placeholder="млн ₽" style={{ width: 120 }} />
+                    </Form.Item>
+                    <Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(f.name)} />
+                  </Space>
+                ))}
+                <Form.Item style={{ marginBottom: 8 }}>
+                  <Button block icon={<PlusOutlined />} onClick={() => add()} disabled={!works.length}>
+                    Добавить работу
+                  </Button>
+                </Form.Item>
+              </>
+            )}
+          </Form.List>
           <Form.Item name="leadSource" label="Источник лида" initialValue="Входящая заявка">
             <Select
               options={['Входящая заявка', 'Партнёр', 'Холодный звонок', 'Тендерная площадка', 'Выставка', 'Повторные продажи', 'Прочее'].map((s) => ({ value: s, label: s }))}
