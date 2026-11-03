@@ -8,6 +8,7 @@ import OverviewTab from './project/OverviewTab'
 import GanttTab from './project/GanttTab'
 import FinanceTab from './project/FinanceTab'
 import PurchasesTab from './project/PurchasesTab'
+import EstimateTab from './project/EstimateTab'
 import RisksTab from './project/RisksTab'
 import SandboxTab from './project/SandboxTab'
 import CascadeTab from './project/CascadeTab'
@@ -28,6 +29,11 @@ export default function ProjectCardPage() {
 
   const { project, summary, computed, client, presale } = data
   const lastMile = [...computed.schedule].filter((r) => r.type === 'milestone').sort((a, b) => +new Date(b.end) - +new Date(a.end))[0]
+  // Если в составе работ есть «Поставка оборудования» — вкладка закупок выделяется.
+  const hasSupplyWork = (project.scope || []).some((it) => it.name === 'Поставка оборудования')
+  // Вкладка сметного расчёта выделяется при «монтажных» работах в составе.
+  const ESTIMATE_WORKS = ['Пусконаладочные работы', 'Проектирование решения', 'Интеграция и тестирование', 'Монтажные работы']
+  const hasEstimateWork = (project.scope || []).some((it) => ESTIMATE_WORKS.includes(it.name))
 
   return (
     <div>
@@ -74,7 +80,8 @@ export default function ProjectCardPage() {
           { key: 'gantt', label: 'СДР и диаграмма Ганта', children: <GanttTab data={data} reload={load} /> },
           { key: 'cascade', label: 'Каскад последствий', children: <CascadeTab data={data} /> },
           { key: 'finance', label: 'Финансы и ДДС', children: <FinanceTab data={data} /> },
-          { key: 'purchases', label: 'Закупки', children: <PurchasesTab data={data} reload={load} /> },
+          { key: 'purchases', label: <span style={hasSupplyWork ? { fontWeight: 600 } : undefined}>Закупки{hasSupplyWork ? ' ⚑' : ''}</span>, children: <PurchasesTab data={data} reload={load} /> },
+          { key: 'estimate', label: <span style={hasEstimateWork ? { fontWeight: 600 } : undefined}>Сметный расчёт на работы{hasEstimateWork ? ' ⚑' : ''}</span>, children: <EstimateTab data={data} reload={load} /> },
           { key: 'risks', label: 'Риски', children: <RisksTab data={data} /> },
           { key: 'sandbox', label: 'What-if песочница', children: <SandboxTab data={data} reload={load} /> },
           { key: 'changes', label: 'Запросы на изменение', children: <ChangesTab data={data} reload={load} /> },

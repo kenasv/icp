@@ -1,5 +1,5 @@
-# Сборка Go-бэкенда ИСУП (многоступенчатая; зависимость — pgx для PostgreSQL).
-FROM golang:1.25-alpine AS build
+# Сборка Go-бэкенда ИСУП (многоступенчатая; зависимости — pgx и excelize).
+FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

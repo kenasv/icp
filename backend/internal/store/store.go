@@ -6,6 +6,7 @@ package store
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
@@ -487,6 +488,109 @@ func (s *Store) UpdatePurchase(projectID, purchaseID string, forecast *time.Time
 // Recalc — пересчёт проекта движком (график + финансы).
 func (s *Store) Recalc(p *model.Project) {
 	engine.RecalcSchedule(p, s.Dirs())
+}
+
+// ============ Оборудование (импорт Excel) ============
+
+// ImportEquipment — загружает распарсенные строки оборудования в проект:
+// каждой строке сервис присваивает случайные сумму и прогнозную дату поставки,
+// статус — «Планируется» (Ф27, вкладка «Закупки»).
+func (s *Store) ImportEquipment(projectID string, items []model.Equipment) (*model.Project, error) {
+	p, ok := s.Projects[projectID]
+	if !ok {
+		return nil, fmt.Errorf("проект %s не найден", projectID)
+	}
+	// Нумерация продолжается после уже загруженных позиций.
+	max := 0
+	for _, e := range p.Equipment {
+		var n int
+		if _, err := fmt.Sscanf(e.ID, "EQ-%d", &n); err == nil && n > max {
+			max = n
+		}
+	}
+	for i := range items {
+		items[i].ID = fmt.Sprintf("EQ-%03d", max+i+1)
+	}
+	p.Equipment = append(p.Equipment, items...)
+	s.AddEvent(p, model.DemoNow, model.EventChange,
+		fmt.Sprintf("Импорт оборудования из Excel: %d позиций (статус «Планируется»)", len(items)), "Менеджер по закупкам")
+	return p, nil
+}
+
+// UpdateEquipmentStatus — смена статуса позиции оборудования (справочник статусов).
+func (s *Store) UpdateEquipmentStatus(projectID, eqID, status string) (*model.Project, error) {
+	valid := false
+	for _, st := range model.EquipmentStatuses {
+		if st == status {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return nil, fmt.Errorf("недопустимый статус оборудования: %s", status)
+	}
+	p, ok := s.Projects[projectID]
+	if !ok {
+		return nil, fmt.Errorf("проект %s не найден", projectID)
+	}
+	for i := range p.Equipment {
+		if p.Equipment[i].ID == eqID {
+			old := p.Equipment[i].Status
+			p.Equipment[i].Status = status
+			s.AddEvent(p, model.DemoNow, model.EventChange,
+				fmt.Sprintf("Оборудование «%s»: статус %s → %s", p.Equipment[i].Name, old, status), "Менеджер по закупкам")
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("позиция оборудования %s не найдена", eqID)
+}
+
+// SetEquipmentDelays — проставляет каждой позиции оборудования дату задержки
+// поставки: случайно, строго позже прогнозной даты поставки, но не более чем
+// через год (365 дней) от неё.
+func (s *Store) SetEquipmentDelays(projectID string, rnd *rand.Rand) (*model.Project, error) {
+	p, ok := s.Projects[projectID]
+	if !ok {
+		return nil, fmt.Errorf("проект %s не найден", projectID)
+	}
+	if len(p.Equipment) == 0 {
+		return nil, fmt.Errorf("в проекте нет оборудования — задержки проставлять нечему")
+	}
+	for i := range p.Equipment {
+		delta := 1 + rnd.Intn(365) // 1..365 дней после прогнозной даты
+		d := p.Equipment[i].Forecast.AddDate(0, 0, delta)
+		p.Equipment[i].DelayDate = &d
+	}
+	s.AddEvent(p, model.DemoNow, model.EventDeviation,
+		fmt.Sprintf("Проставлены даты задержки поставки оборудования: %d позиций (позже прогноза, не более года)", len(p.Equipment)), "Менеджер по закупкам")
+	return p, nil
+}
+
+// ImportEstimate — загружает строки сметного расчёта на работы (Excel):
+// каждой строке сервис присваивает случайную сумму (млн ₽).
+func (s *Store) ImportEstimate(projectID string, items []model.EstimateItem) (*model.Project, error) {
+	p, ok := s.Projects[projectID]
+	if !ok {
+		return nil, fmt.Errorf("проект %s не найден", projectID)
+	}
+	max := 0
+	for _, it := range p.Estimate {
+		var n int
+		if _, err := fmt.Sscanf(it.ID, "EST-%d", &n); err == nil && n > max {
+			max = n
+		}
+	}
+	for i := range items {
+		items[i].ID = fmt.Sprintf("EST-%03d", max+i+1)
+	}
+	p.Estimate = append(p.Estimate, items...)
+	total := 0.0
+	for _, it := range items {
+		total += it.Amount
+	}
+	s.AddEvent(p, model.DemoNow, model.EventChange,
+		fmt.Sprintf("Сметный расчёт на работы: импорт %d строк из Excel, сумма %.1f млн ₽", len(items), total), "РП")
+	return p, nil
 }
 
 // ============ Запросы на изменение ============

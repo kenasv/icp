@@ -154,6 +154,8 @@ type Project struct {
 	WBS            []WBSItem     `json:"wbs"`
 	Budget         []BudgetItem  `json:"budget"`
 	Purchases      []Purchase    `json:"purchases"`
+	Equipment      []Equipment   `json:"equipment"`
+	Estimate       []EstimateItem `json:"estimate"`
 	Risks          []Risk        `json:"risks"`
 	Baselines      []Baseline    `json:"baselines"`
 	Events         []Event       `json:"events"`
@@ -175,6 +177,12 @@ func (p *Project) EnsureSlices() {
 	}
 	if p.Purchases == nil {
 		p.Purchases = []Purchase{}
+	}
+	if p.Equipment == nil {
+		p.Equipment = []Equipment{}
+	}
+	if p.Estimate == nil {
+		p.Estimate = []EstimateItem{}
 	}
 	if p.Risks == nil {
 		p.Risks = []Risk{}
@@ -227,6 +235,42 @@ type WBSItem struct {
 	Dependencies []Dependency `json:"dependencies,omitempty"` // FS + лаг
 	PurchaseID   string       `json:"purchaseId,omitempty"`   // привязка закупки (для вех)
 	BudgetItemIDs []string    `json:"budgetItemIds,omitempty"` // привязки статей (для карточки привязок Ф16)
+}
+
+// ============ Оборудование проекта (импорт Excel на вкладке «Закупки») ============
+
+// Статусы оборудования — фиксированный справочник.
+const (
+	EquipPlanned   = "Планируется"
+	EquipOrdering  = "В закупке"
+	EquipDelivered = "Доставлено"
+)
+
+// EquipmentStatuses — справочник статусов оборудования (для селектов интерфейса).
+var EquipmentStatuses = []string{EquipPlanned, EquipOrdering, EquipDelivered}
+
+// Equipment — позиция оборудования проекта. Строки приходят из Excel-импорта
+// (столбец 1 — наименование, столбец 2 — количество), сумма и прогнозная дата
+// поставки присваиваются сервисом импорта, стартовый статус — «Планируется».
+// DelayDate — дата задержки поставки (проставляется отдельно, позже прогнозной
+// даты, но не более чем через год от неё).
+type Equipment struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	Qty       int        `json:"qty"`
+	Amount    float64    `json:"amount"`   // млн ₽ за позицию
+	Forecast  time.Time  `json:"forecast"` // прогнозная дата поставки
+	DelayDate *time.Time `json:"delayDate,omitempty"`
+	Status    string     `json:"status"` // из справочника статусов оборудования
+}
+
+// EstimateItem — строка сметного расчёта на работы: наименование работы и объём
+// приходят из Excel-импорта (столбцы 1 и 2), сумма присваивается сервисом случайно.
+type EstimateItem struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Volume string  `json:"volume"` // объём работ (как в файле: «100 м2», «2 ч»…)
+	Amount float64 `json:"amount"` // млн ₽ — присвоено сервисом импорта
 }
 
 // ============ Закупки (Ф27–Ф29) ============

@@ -15,6 +15,15 @@ export interface Region { id: string; name: string }
 // плановая дата реализации и плановая стоимость (млн ₽).
 export interface ScopeItem { workId: string; name: string; date: string; cost: number }
 
+// Позиция оборудования проекта (импорт Excel на вкладке «Закупки»).
+export interface Equipment {
+  id: string; name: string; qty: number; amount: number
+  forecast: string; delayDate?: string; status: string // Планируется | В закупке | Доставлено
+}
+
+// Строка сметного расчёта на работы (импорт Excel).
+export interface EstimateItem { id: string; name: string; volume: string; amount: number }
+
 export interface StageChange { date: string; fromStage: string; toStage: string; comment?: string }
 
 export interface PresaleView {
@@ -135,7 +144,8 @@ export interface Project {
   id: string; name: string; clientId: string; product: string; region: string; type: string
   contractAmount: number; status: string; note?: string; presaleId: string
   team: { employeeId: string; role: string }[]; wbs: any[]; budget: any[]
-  purchases: Purchase[]; risks: Risk[]; baselines: Baseline[]; events: EventItem[]; scenarios: Scenario[]
+  purchases: Purchase[]; equipment: Equipment[]; estimate: EstimateItem[]; risks: Risk[]; baselines: Baseline[]; events: EventItem[]; scenarios: Scenario[]
+  scope?: ScopeItem[]
 }
 
 export interface ProjectCard {

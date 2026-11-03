@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS projects (
   status text NOT NULL DEFAULT '', note text NOT NULL DEFAULT '', presale_id text NOT NULL DEFAULT '',
   team jsonb NOT NULL DEFAULT '[]', wbs jsonb NOT NULL DEFAULT '[]', budget jsonb NOT NULL DEFAULT '[]',
   purchases jsonb NOT NULL DEFAULT '[]', risks jsonb NOT NULL DEFAULT '[]', baselines jsonb NOT NULL DEFAULT '[]',
-  events jsonb NOT NULL DEFAULT '[]', scenarios jsonb NOT NULL DEFAULT '[]', scope jsonb NOT NULL DEFAULT '[]'
+  events jsonb NOT NULL DEFAULT '[]', scenarios jsonb NOT NULL DEFAULT '[]', scope jsonb NOT NULL DEFAULT '[]',
+  equipment jsonb NOT NULL DEFAULT '[]', estimate jsonb NOT NULL DEFAULT '[]'
 );
 CREATE TABLE IF NOT EXISTS change_requests (
   id text PRIMARY KEY, project_id text NOT NULL DEFAULT '', type text NOT NULL DEFAULT '',
@@ -91,6 +92,8 @@ CREATE TABLE IF NOT EXISTS bpmn (
 	const migration = `
 ALTER TABLE presales ADD COLUMN IF NOT EXISTS scope jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS scope jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS equipment jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS estimate jsonb NOT NULL DEFAULT '[]';
 `
 	if _, err := d.db.Exec(schema); err != nil {
 		return err
@@ -208,11 +211,11 @@ func insertProject(tx *sql.Tx, p *model.Project) error {
 	mustJSON := func(v any) []byte { b, _ := json.Marshal(v); return b }
 	_, err := tx.Exec(`
 INSERT INTO projects (id, name, client_id, product, region, type, contract_amount, status, note, presale_id,
-  team, wbs, budget, purchases, risks, baselines, events, scenarios, scope)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+  team, wbs, budget, purchases, risks, baselines, events, scenarios, scope, equipment, estimate)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
 		p.ID, p.Name, p.ClientID, p.Product, p.Region, p.Type, p.ContractAmount, p.Status, p.Note, p.PresaleID,
 		mustJSON(p.Team), mustJSON(p.WBS), mustJSON(p.Budget), mustJSON(p.Purchases),
-		mustJSON(p.Risks), mustJSON(p.Baselines), mustJSON(p.Events), mustJSON(p.Scenarios), mustJSON(p.Scope))
+		mustJSON(p.Risks), mustJSON(p.Baselines), mustJSON(p.Events), mustJSON(p.Scenarios), mustJSON(p.Scope), mustJSON(p.Equipment), mustJSON(p.Estimate))
 	return err
 }
 
@@ -368,17 +371,17 @@ SELECT id, number, name, client_id, product, region, amount, stage_id,
 
 	rows6, err := d.db.Query(`
 SELECT id, name, client_id, product, region, type, contract_amount, status, note, presale_id,
-  team, wbs, budget, purchases, risks, baselines, events, scenarios, scope FROM projects`)
+  team, wbs, budget, purchases, risks, baselines, events, scenarios, scope, equipment, estimate FROM projects`)
 	if err != nil {
 		return err
 	}
 	defer rows6.Close()
 	for rows6.Next() {
 		p := &model.Project{}
-		var team, wbs, budget, purchases, risks, baselines, events, scenarios, scope []byte
+		var team, wbs, budget, purchases, risks, baselines, events, scenarios, scope, equipment, estimate []byte
 		if err := rows6.Scan(&p.ID, &p.Name, &p.ClientID, &p.Product, &p.Region, &p.Type,
 			&p.ContractAmount, &p.Status, &p.Note, &p.PresaleID,
-			&team, &wbs, &budget, &purchases, &risks, &baselines, &events, &scenarios, &scope); err != nil {
+			&team, &wbs, &budget, &purchases, &risks, &baselines, &events, &scenarios, &scope, &equipment, &estimate); err != nil {
 			return err
 		}
 		for _, pair := range []struct {
@@ -387,7 +390,7 @@ SELECT id, name, client_id, product, region, type, contract_amount, status, note
 		}{
 			{team, &p.Team}, {wbs, &p.WBS}, {budget, &p.Budget}, {purchases, &p.Purchases},
 			{risks, &p.Risks}, {baselines, &p.Baselines}, {events, &p.Events}, {scenarios, &p.Scenarios},
-			{scope, &p.Scope},
+			{scope, &p.Scope}, {equipment, &p.Equipment}, {estimate, &p.Estimate},
 		} {
 			if len(pair.raw) > 0 {
 				if err := json.Unmarshal(pair.raw, pair.dst); err != nil {

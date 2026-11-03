@@ -1,17 +1,52 @@
 import { useState } from 'react'
-import { Card, Table, Tag, Typography, DatePicker, Select, Modal, List, message, Alert } from 'antd'
+import { Card, Table, Tag, Typography, DatePicker, Select, Modal, List, message, Alert, Upload, Button, Space } from 'antd'
+import { ThunderboltOutlined, UploadOutlined } from '@ant-design/icons'
 import type { ProjectCard, ImpactPreview } from '../../types'
 import { api } from '../../api'
 import { fmtDate, fmtMoney, toDateInput } from '../../format'
 
 // Закупки (Ф27–Ф29): статусы, план/прогноз поставки. Перед изменением прогнозной
 // даты — предупреждение с числом затронутых задач и вех (Ф20) и подтверждение.
+// Ниже — состав оборудования проекта: импорт из Excel (столбцы: наименование,
+// количество), сервис присваивает случайные сумму и прогнозную дату, статус «Планируется».
 const STATUS_FLOW = ['создана', 'заказ размещён', 'договор подписан', 'получено']
+const EQUIP_STATUSES = ['Планируется', 'В закупке', 'Доставлено']
 
 export default function PurchasesTab({ data, reload }: { data: ProjectCard; reload: () => void }) {
   const [preview, setPreview] = useState<{ pid: string; date: string; data: ImpactPreview } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [delaying, setDelaying] = useState(false)
   const purchases = data.project.purchases
+  const equipment = data.project.equipment || []
+
+  const importExcel = async (file: File) => {
+    setImporting(true)
+    try {
+      await api.importEquipment(data.project.id, file)
+      message.success('Оборудование из Excel загружено: суммы и прогнозные даты присвоены, статус «Планируется»')
+      reload()
+    } catch (e: any) {
+      message.error(e.message)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  // Проставить даты задержки: случайно, позже прогнозной даты поставки,
+  // но не более чем через год от неё; строки обновляются в карточке проекта.
+  const setDelays = async () => {
+    setDelaying(true)
+    try {
+      await api.setEquipmentDelays(data.project.id)
+      message.success('Даты задержки проставлены по всем позициям оборудования')
+      reload()
+    } catch (e: any) {
+      message.error(e.message)
+    } finally {
+      setDelaying(false)
+    }
+  }
 
   const mileName = (id: string) => data.computed.schedule.find((r) => r.id === id)?.name ?? id
   const supplierName = (id: string) => id // имена поставщиков приходят в карточке привязок Ганта
@@ -131,6 +166,92 @@ export default function PurchasesTab({ data, reload }: { data: ProjectCard; relo
           </>
         )}
       </Modal>
+
+      {/* Состав оборудования проекта: импорт из Excel (Ф27) */}
+      <Card
+        size="small"
+        title="Оборудование проекта (импорт из Excel)"
+        style={{ marginTop: 16 }}
+        extra={
+          <Space wrap>
+            {equipment.length > 0 && (
+              <Button
+                icon={<ThunderboltOutlined />}
+                loading={delaying}
+                onClick={setDelays}
+                title="Случайно, позже прогнозной даты поставки, но не более чем через год от неё"
+              >
+                Проставить задержки
+              </Button>
+            )}
+            <Upload
+              accept=".xlsx,.xls"
+              showUploadList={false}
+              disabled={importing}
+              customRequest={({ file }) => importExcel(file as unknown as File)}
+            >
+              <Button icon={<UploadOutlined />} loading={importing}>
+                Загрузить Excel
+              </Button>
+            </Upload>
+          </Space>
+        }
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+          Файл: столбец 1 — наименование оборудования, столбец 2 — количество. Сервис парсит строки
+          и сохраняет их в связке с проектом, присваивая случайные сумму и прогнозную дату поставки;
+          стартовый статус — «Планируется» (справочник: Планируется / В закупке / Доставлено).
+          «Проставить задержки» задаёт дату задержки по каждой строке: случайно, позже прогнозной
+          даты поставки, но не более чем через год от неё.
+        </Typography.Paragraph>
+        <Table
+          rowKey="id"
+          size="small"
+          dataSource={equipment}
+          pagination={false}
+          scroll={{ x: 900 }}
+          locale={{ emptyText: 'Оборудование ещё не загружено' }}
+          columns={[
+            { title: 'Наименование', dataIndex: 'name' },
+            { title: 'Кол-во', dataIndex: 'qty', width: 80, align: 'right' as const },
+            { title: 'Сумма, млн ₽', dataIndex: 'amount', width: 110, align: 'right' as const,
+              render: (v: number) => (v ?? 0).toFixed(1).replace('.', ',') },
+            { title: 'Прогноз поставки', dataIndex: 'forecast', width: 130, render: (v: string) => fmtDate(v) },
+            {
+              title: 'Задержка', dataIndex: 'delayDate', width: 150,
+              render: (v: string | undefined, r: any) => {
+                if (!v) return <span style={{ color: '#bbb' }}>—</span>
+                const days = Math.round((+new Date(v) - +new Date(r.forecast)) / 86400000)
+                return (
+                  <span style={{ color: '#cf1322' }}>
+                    {fmtDate(v)} <Tag color="red" style={{ marginInlineStart: 4 }}>+{days} дн.</Tag>
+                  </span>
+                )
+              },
+            },
+            {
+              title: 'Статус', dataIndex: 'status', width: 160,
+              render: (s: string, r: any) => (
+                <Select
+                  size="small"
+                  value={s}
+                  style={{ width: '100%' }}
+                  onChange={async (v) => {
+                    try {
+                      await api.patchEquipment(data.project.id, r.id, v)
+                      message.success(`Статус оборудования обновлён: ${v}`)
+                      reload()
+                    } catch (e: any) {
+                      message.error(e.message)
+                    }
+                  }}
+                  options={EQUIP_STATUSES.map((x) => ({ value: x, label: x }))}
+                />
+              ),
+            },
+          ]}
+        />
+      </Card>
     </Card>
   )
 }

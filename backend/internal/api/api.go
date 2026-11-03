@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"isup/internal/bpmn"
 	"isup/internal/c4"
 	"isup/internal/engine"
+	"isup/internal/equip"
 	"isup/internal/model"
 	"isup/internal/pg"
 	"isup/internal/store"
@@ -67,6 +69,10 @@ func (s *Server) routes() {
 	m.HandleFunc("PATCH /api/projects/{id}/wbs/{itemId}", s.handlePatchWBS)
 	m.HandleFunc("POST /api/projects/{id}/purchases/{pid}/preview", s.handlePurchasePreview)
 	m.HandleFunc("PATCH /api/projects/{id}/purchases/{pid}", s.handlePatchPurchase)
+	m.HandleFunc("POST /api/projects/{id}/equipment/import", s.handleEquipmentImport)
+	m.HandleFunc("POST /api/projects/{id}/equipment/delay", s.handleEquipmentDelay)
+	m.HandleFunc("PATCH /api/projects/{id}/equipment/{eid}", s.handlePatchEquipment)
+	m.HandleFunc("POST /api/projects/{id}/estimate/import", s.handleEstimateImport)
 	m.HandleFunc("GET /api/projects/{id}/scenarios", s.handleScenarios)
 	m.HandleFunc("POST /api/projects/{id}/scenarios", s.handleCreateScenario)
 	m.HandleFunc("POST /api/projects/{id}/scenarios/{sid}/to-cr", s.handleScenarioToCR)
@@ -158,6 +164,7 @@ func (s *Server) handleDirectories(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"clients": clients, "suppliers": suppliers, "employees": employees,
 		"works": works, "products": products, "regions": regions, "stages": s.st.Stages,
+		"equipmentStatuses": model.EquipmentStatuses,
 	})
 }
 
@@ -612,6 +619,103 @@ func (s *Server) handlePatchPurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, s.buildCard(p))
+}
+
+// handleEquipmentImport — загрузка Excel со составом оборудования (multipart):
+// столбец 1 — наименование, столбец 2 — количество. Сервис парсит строки,
+// присваивает случайные сумму и прогнозную дату, статус «Планируется».
+func (s *Server) handleEquipmentImport(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeErr(w, 400, fmt.Errorf("файл не передан (поле file): %w", err))
+		return
+	}
+	defer file.Close()
+	rows, err := equip.Parse(file)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	items := equip.Fill(rows, model.DemoNow, rnd)
+
+	s.st.LockStore()
+	p, err := s.st.ImportEquipment(r.PathValue("id"), items)
+	s.st.UnlockStore()
+	if err != nil {
+		writeErr(w, 404, err)
+		return
+	}
+	s.st.RLockStore()
+	defer s.st.RUnlockStore()
+	writeJSON(w, 201, map[string]any{"imported": len(items), "card": s.buildCard(p)})
+}
+
+// handleEquipmentDelay — проставить даты задержки поставки оборудования:
+// случайно, позже прогнозной даты, но не более чем через год от неё.
+func (s *Server) handleEquipmentDelay(w http.ResponseWriter, r *http.Request) {
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	s.st.LockStore()
+	p, err := s.st.SetEquipmentDelays(r.PathValue("id"), rnd)
+	s.st.UnlockStore()
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	s.st.RLockStore()
+	defer s.st.RUnlockStore()
+	writeJSON(w, 200, s.buildCard(p))
+}
+
+// handlePatchEquipment — смена статуса позиции оборудования (из справочника статусов).
+func (s *Server) handlePatchEquipment(w http.ResponseWriter, r *http.Request) {
+	body, err := decode[struct {
+		Status string `json:"status"`
+	}](r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	s.st.LockStore()
+	p, err := s.st.UpdateEquipmentStatus(r.PathValue("id"), r.PathValue("eid"), body.Status)
+	s.st.UnlockStore()
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	s.st.RLockStore()
+	defer s.st.RUnlockStore()
+	writeJSON(w, 200, s.buildCard(p))
+}
+
+// handleEstimateImport — загрузка Excel сметного расчёта на работы (multipart):
+// столбец 1 — наименование работы, столбец 2 — объём работ. Сервис парсит строки
+// и присваивает каждой случайную сумму.
+func (s *Server) handleEstimateImport(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeErr(w, 400, fmt.Errorf("файл не передан (поле file): %w", err))
+		return
+	}
+	defer file.Close()
+	rows, err := equip.ParseEstimate(file)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	items := equip.FillEstimate(rows, rnd)
+
+	s.st.LockStore()
+	p, err := s.st.ImportEstimate(r.PathValue("id"), items)
+	s.st.UnlockStore()
+	if err != nil {
+		writeErr(w, 404, err)
+		return
+	}
+	s.st.RLockStore()
+	defer s.st.RUnlockStore()
+	writeJSON(w, 201, map[string]any{"imported": len(items), "card": s.buildCard(p)})
 }
 
 // ============ Сценарии (what-if песочница) ============

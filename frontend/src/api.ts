@@ -52,6 +52,42 @@ export const api = {
   patchPurchase: (id: string, pid: string, body: any) =>
     req<ProjectCard>(`/projects/${id}/purchases/${pid}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
+  // Импорт состава оборудования из Excel (multipart) и смена статуса позиции.
+  importEquipment: async (id: string, file: File): Promise<ProjectCard> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`${BASE}/projects/${id}/equipment/import`, { method: 'POST', body: fd })
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`
+      try {
+        const body = await res.json()
+        if (body?.error) msg = body.error
+      } catch { /* ignore */ }
+      throw new Error(msg)
+    }
+    return res.json()
+  },
+  patchEquipment: (id: string, eid: string, status: string) =>
+    req<ProjectCard>(`/projects/${id}/equipment/${eid}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  setEquipmentDelays: (id: string) =>
+    req<ProjectCard>(`/projects/${id}/equipment/delay`, { method: 'POST' }),
+
+  // Импорт сметного расчёта на работы из Excel (multipart).
+  importEstimate: async (id: string, file: File): Promise<ProjectCard> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`${BASE}/projects/${id}/estimate/import`, { method: 'POST', body: fd })
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`
+      try {
+        const body = await res.json()
+        if (body?.error) msg = body.error
+      } catch { /* ignore */ }
+      throw new Error(msg)
+    }
+    return res.json()
+  },
+
   scenarios: (id: string) => req<Scenario[]>(`/projects/${id}/scenarios`),
   createScenario: (id: string, body: { name: string; ops: ScenarioOp[]; save: boolean }) =>
     req<{ comparison: ScenarioComparison; scenario: Scenario | null }>(`/projects/${id}/scenarios`, { method: 'POST', body: JSON.stringify(body) }),
