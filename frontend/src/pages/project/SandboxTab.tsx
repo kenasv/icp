@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, Form, InputNumber, Input, Select, Button, Table, Tag, Typography, message, Space, Modal } from 'antd'
 import { ExperimentOutlined, SaveOutlined, FileProtectOutlined } from '@ant-design/icons'
 import type { ProjectCard, ScenarioComparison, ScenarioOp, Scenario } from '../../types'
@@ -19,6 +19,14 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
   const [saved, setSaved] = useState<Scenario | null>(null)
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [running, setRunning] = useState(false)
+  const [openingId, setOpeningId] = useState<string | null>(null)
+  const cmpRef = useRef<HTMLDivElement>(null)
+
+  // Карточка сравнения расположена над таблицей сценариев: после обновления
+  // показываем её пользователю (клик снизу иначе выглядит как «ничего не произошло»).
+  const revealComparison = () => {
+    setTimeout(() => cmpRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }
 
   const loadScenarios = () => api.scenarios(project.id).then(setScenarios)
   useEffect(() => { loadScenarios() }, [project.id])
@@ -43,6 +51,7 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
       })
       setComparison(res.comparison)
       setSaved(res.scenario)
+      revealComparison()
       if (save) {
         message.success('Сценарий сохранён (базовый план не изменён)')
         loadScenarios()
@@ -199,13 +208,14 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
       </Card>
 
       {comparison && (
-        <Card size="small" title="Сравнение: базовый план / текущий прогноз / сценарий" style={{ marginBottom: 16 }}>
-          <Table
-            rowKey="key"
-            size="small"
-            dataSource={rows}
-            pagination={false}
-            scroll={{ x: 640 }}
+        <div ref={cmpRef}>
+          <Card size="small" title="Сравнение: базовый план / текущий прогноз / сценарий" style={{ marginBottom: 16 }}>
+            <Table
+              rowKey="key"
+              size="small"
+              dataSource={rows}
+              pagination={false}
+              scroll={{ x: 640 }}
             columns={[
               { title: 'Показатель', dataIndex: 'name' },
               col('Базовый план', comparison.base),
@@ -213,7 +223,8 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
               col('Сценарий', comparison.scenario),
             ]}
           />
-        </Card>
+          </Card>
+        </div>
       )}
 
       <Card size="small" title="Сохранённые сценарии">
@@ -231,12 +242,25 @@ export default function SandboxTab({ data, reload }: { data: ProjectCard; reload
               title: '', width: 320,
               render: (_: any, sc) => (
                 <Space>
-                  <Button size="small" onClick={async () => {
-                    setOps(sc.ops)
-                    setName(sc.name)
-                    const res = await api.createScenario(project.id, { name: sc.name, ops: sc.ops, save: false })
-                    setComparison(res.comparison)
-                  }}>
+                  <Button
+                    size="small"
+                    loading={openingId === sc.id}
+                    onClick={async () => {
+                      setOpeningId(sc.id)
+                      try {
+                        setOps(sc.ops)
+                        setName(sc.name)
+                        const res = await api.createScenario(project.id, { name: sc.name, ops: sc.ops, save: false })
+                        setComparison(res.comparison)
+                        message.success(`Сценарий «${sc.name}» открыт в сравнении`)
+                        revealComparison()
+                      } catch (e: any) {
+                        message.error(e.message)
+                      } finally {
+                        setOpeningId(null)
+                      }
+                    }}
+                  >
                     Открыть в сравнении
                   </Button>
                   <Button size="small" type="primary" ghost icon={<FileProtectOutlined />} onClick={() => toCR(sc)}>
